@@ -1,0 +1,184 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		13D8521104B081E236625BE8 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38058A1CB8AF9F84D236D3F8 /* AppDelegate.swift */; };
+		7E8E9CD0981E9FDE83DF7A1B /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E20C40AF45A3800BC43C12B /* AppEnvironment.swift */; };
+		46D31D36A1663BE5270E8826 /* NeManeemApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031353CB3E68F9621B5C634D /* NeManeemApp.swift */; };
+		A037E52B23AF82417DC889B4 /* AppNetworkUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A617D7C42B6C2621910D0C6F /* AppNetworkUsage.swift */; };
+		7DB46D32B436CB9E365F9A39 /* NetworkSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918E976937118B3BC756981E /* NetworkSnapshot.swift */; };
+		1B20FC9AF4358C5B8FC7567C /* ResourceProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92A94BC67DBAF1E642DF07AE /* ResourceProfile.swift */; };
+		5A236B7746AFB8647C5702D8 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E761F3FAF70595B34D96EAD2 /* SettingsStore.swift */; };
+		DAF2AD56590B268C6FCC17EE /* UsageHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC6C88B9A99E287CDD2F6AB1 /* UsageHistory.swift */; };
+		A4D9CB52A6BB8779959B1E13 /* AppTrafficMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAA2538A51C0A57D6048950 /* AppTrafficMonitor.swift */; };
+		8A046ECBC1EA9C25D197B9D5 /* FirewallController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A1BA8AD52EF4772ADD47AE /* FirewallController.swift */; };
+		9B709A7DADA810FD8F3A41B6 /* LoginItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 362BB633CF417B64569D3263 /* LoginItemController.swift */; };
+		B69C74B7CEFA8AD8979AEAA0 /* NetworkInterfaceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CC7C7EC2E05E315D569539A /* NetworkInterfaceMonitor.swift */; };
+		84367DFB6B58CB529320154E /* SettingsTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C51A36E8964D68BA01089E /* SettingsTransferService.swift */; };
+		EB0415002705C1D3E497D149 /* TrafficXPCProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B42BDEB32EF9A86CF7772B /* TrafficXPCProtocol.swift */; };
+		BAD9D00BD6C18C503E2EDB68 /* TroubleshootingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A05EB107EC43DABB497DCE /* TroubleshootingService.swift */; };
+		C706036A1AF209E91C33C908 /* UsageRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B0B11E16C0ABFA91540043 /* UsageRecorder.swift */; };
+		2FFA4E27EC7902F4B92D9362 /* XLSXExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133FA314065AC621E4E6914A /* XLSXExporter.swift */; };
+		1032B1B13F7979CAF4973C7F /* GeneralAdvancedSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82AC0C3432C31C83BAC33EA /* GeneralAdvancedSettings.swift */; };
+		E9EFB7788B3463A42426FFF9 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848B14E05A3EE86C428D4055 /* MainWindow.swift */; };
+		C84E9F660A90ED0391FA4B83 /* NeManeemUIRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE542D30640502348546E45 /* NeManeemUIRules.swift */; };
+		F7C368A5F5335F4F2943AD9D /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 340163AD71447FC7A756A810 /* PopoverView.swift */; };
+		8B52B633E6E8D4ADFD9CB859 /* SettingsDescriptionComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02F5ABCED203B7D8FD2FB78 /* SettingsDescriptionComponents.swift */; };
+		C16C3D47F71F042C4935973B /* SettingsEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA23120BED923469B653953 /* SettingsEditors.swift */; };
+		5AC87934610AED2C6B6437CB /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C3576F664F7BAED0730CFD /* StatusBarController.swift */; };
+		C47E8392B8AA423F4E84BF5B /* StatusItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC970F3A6E7C04D63C2AF8B9 /* StatusItemView.swift */; };
+		AE26C62D19FBC9F277A51094 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8927BF67C8646EB01EA3C883 /* AppConstants.swift */; };
+		173ECB4FD80BEDC48F463638 /* AppLocationResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF32DC9C6D06197DDE4F878 /* AppLocationResolver.swift */; };
+		1ACA209BD326A61962658E12 /* AppearanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111DDD0A93EC47ACA5FF0054 /* AppearanceController.swift */; };
+		FF80F12EA3E3A8414CDF6D85 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CFD580B39051875FD81F3BC /* L10n.swift */; };
+		9465C32356021FBDA32B6FA1 /* NeManeemTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F56EEAE1AB75AF88BE1E326 /* NeManeemTheme.swift */; };
+		3FD6330225067A16148B4BFB /* SpeedFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E9E97528B4A647401E6DBDA /* SpeedFormatter.swift */; };
+		285DC3DB44D1201DD948345A /* SystemSettingsOpener.swift in Sources */ = {isa = PBXBuildFile; fileRef = F819B14855AE7BF00FE88277 /* SystemSettingsOpener.swift */; };
+		6E08201C56AFAB743AFB9896 /* NeManeemFilterDataProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E65A2F6B8537FC59E93100B /* NeManeemFilterDataProvider.swift */; };
+		5706D634B8AC0B19B6FD7A0C /* TrafficMeasurementEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430DB9C52DF36A68E28F5615 /* TrafficMeasurementEngine.swift */; };
+		77C52EAAEE5D943E9DA7D9EE /* TrafficXPCProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FE088A129C84EDF1E6EC9DD /* TrafficXPCProtocol.swift */; };
+		A808F75DB3ED4BEA7EC80101 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2BF0197B32B9DD4F042235A /* main.swift */; };
+		3354621689C05BFFFA9F29E6 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 26AFBE155EA129055325774B /* AppKit.framework */; };
+		5660D93CD4DBA08D6CC4FDBF /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E67FCF49C0C6F255316445A8 /* SwiftUI.framework */; };
+		CB8DFADF2422D2B4F6AE362F /* Combine.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63B2DB518955C17F4C2A34E5 /* Combine.framework */; };
+		B28E2E229B16940E2846E621 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6CD70B141F27135DDD16D2B1 /* CoreLocation.framework */; };
+		EFC1F9D2E3F58603C41321DC /* CoreWLAN.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FDA590E255E29F0D2357458D /* CoreWLAN.framework */; };
+		A21F675AC2EF3F40A07910E4 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED57A73197EF0EB610C51175 /* CryptoKit.framework */; };
+		BF943B20C895E8DBC3597D71 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CE61EDA2E1EB0CC45006D15 /* Network.framework */; };
+		550234A39305E63096CF552E /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CF67AC72C7D5C57833646D44 /* NetworkExtension.framework */; };
+		3E466578C8F4DEAF0F7260ED /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3BC060A62BE87CC1F9436530 /* Security.framework */; };
+		05B774280108F42055909D84 /* SystemExtensions.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E7A264E046E127A59F1DE167 /* SystemExtensions.framework */; };
+		4C29D17192B5DFE8A2FFE65D /* UniformTypeIdentifiers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FF486FBD308A9406F69A68AB /* UniformTypeIdentifiers.framework */; };
+		321B6E6469E7307F8D23867C /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6CA5BE48E896A7E6353A5605 /* ServiceManagement.framework */; };
+		67183C56D60F364EC0A221C1 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CF67AC72C7D5C57833646D44 /* NetworkExtension.framework */; };
+		FA490CEDFA67BA07A10C592F /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3BC060A62BE87CC1F9436530 /* Security.framework */; };
+		F0E0B27556BE352A11779657 /* com.bak2ya.NeManeem.Filter.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 4AFAC920BF1630972425D5BB /* com.bak2ya.NeManeem.Filter.systemextension */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		28013CB1AAD0E177074237F6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C39E71EF6470A691F38D3254 /* Assets.xcassets */; };
+		3B557BEB97A627979EC7EFF2 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = AC1359887ACD06B9AFDF66E5 /* AppIcon.icon */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D799BAE6088A90139B415FCC = {isa = PBXContainerItemProxy; containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */; proxyType = 1; remoteGlobalIDString = AC8BAA12C330271C02BB2E90; remoteInfo = NeManeemFilter; };
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		DE58E2B17C19600779694943 = {isa = PBXTargetDependency; target = AC8BAA12C330271C02BB2E90 /* NeManeemFilter */; targetProxy = D799BAE6088A90139B415FCC; };
+/* End PBXTargetDependency section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		060C35239F908B8E4EB554F4 /* Embed System Extensions */ = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = "$(SYSTEM_EXTENSIONS_FOLDER_PATH)"; dstSubfolderSpec = 16; files = (F0E0B27556BE352A11779657,); name = "Embed System Extensions"; runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		5718BA8B2965F0F686C8E55B /* NeManeem.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NeManeem.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4AFAC920BF1630972425D5BB /* com.bak2ya.NeManeem.Filter.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = com.bak2ya.NeManeem.Filter.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
+		38058A1CB8AF9F84D236D3F8 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/App/AppDelegate.swift; sourceTree = "<group>"; };
+		6E20C40AF45A3800BC43C12B /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/App/AppEnvironment.swift; sourceTree = "<group>"; };
+		031353CB3E68F9621B5C634D /* NeManeemApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/App/NeManeemApp.swift; sourceTree = "<group>"; };
+		A617D7C42B6C2621910D0C6F /* AppNetworkUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Models/AppNetworkUsage.swift; sourceTree = "<group>"; };
+		918E976937118B3BC756981E /* NetworkSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Models/NetworkSnapshot.swift; sourceTree = "<group>"; };
+		92A94BC67DBAF1E642DF07AE /* ResourceProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Models/ResourceProfile.swift; sourceTree = "<group>"; };
+		E761F3FAF70595B34D96EAD2 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Models/SettingsStore.swift; sourceTree = "<group>"; };
+		BC6C88B9A99E287CDD2F6AB1 /* UsageHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Models/UsageHistory.swift; sourceTree = "<group>"; };
+		FFAA2538A51C0A57D6048950 /* AppTrafficMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Services/AppTrafficMonitor.swift; sourceTree = "<group>"; };
+		31A1BA8AD52EF4772ADD47AE /* FirewallController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Services/FirewallController.swift; sourceTree = "<group>"; };
+		362BB633CF417B64569D3263 /* LoginItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Services/LoginItemController.swift; sourceTree = "<group>"; };
+		3CC7C7EC2E05E315D569539A /* NetworkInterfaceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Services/NetworkInterfaceMonitor.swift; sourceTree = "<group>"; };
+		39C51A36E8964D68BA01089E /* SettingsTransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Services/SettingsTransferService.swift; sourceTree = "<group>"; };
+		F5B42BDEB32EF9A86CF7772B /* TrafficXPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Services/TrafficXPCProtocol.swift; sourceTree = "<group>"; };
+		F0A05EB107EC43DABB497DCE /* TroubleshootingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Services/TroubleshootingService.swift; sourceTree = "<group>"; };
+		B9B0B11E16C0ABFA91540043 /* UsageRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Services/UsageRecorder.swift; sourceTree = "<group>"; };
+		133FA314065AC621E4E6914A /* XLSXExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Services/XLSXExporter.swift; sourceTree = "<group>"; };
+		F82AC0C3432C31C83BAC33EA /* GeneralAdvancedSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/UI/GeneralAdvancedSettings.swift; sourceTree = "<group>"; };
+		848B14E05A3EE86C428D4055 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/UI/MainWindow.swift; sourceTree = "<group>"; };
+		CAE542D30640502348546E45 /* NeManeemUIRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/UI/NeManeemUIRules.swift; sourceTree = "<group>"; };
+		340163AD71447FC7A756A810 /* PopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/UI/PopoverView.swift; sourceTree = "<group>"; };
+		C02F5ABCED203B7D8FD2FB78 /* SettingsDescriptionComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/UI/SettingsDescriptionComponents.swift; sourceTree = "<group>"; };
+		FBA23120BED923469B653953 /* SettingsEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/UI/SettingsEditors.swift; sourceTree = "<group>"; };
+		D4C3576F664F7BAED0730CFD /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/UI/StatusBarController.swift; sourceTree = "<group>"; };
+		FC970F3A6E7C04D63C2AF8B9 /* StatusItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/UI/StatusItemView.swift; sourceTree = "<group>"; };
+		8927BF67C8646EB01EA3C883 /* AppConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/AppConstants.swift; sourceTree = "<group>"; };
+		3AF32DC9C6D06197DDE4F878 /* AppLocationResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/AppLocationResolver.swift; sourceTree = "<group>"; };
+		111DDD0A93EC47ACA5FF0054 /* AppearanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/AppearanceController.swift; sourceTree = "<group>"; };
+		1CFD580B39051875FD81F3BC /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/L10n.swift; sourceTree = "<group>"; };
+		6F56EEAE1AB75AF88BE1E326 /* NeManeemTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/NeManeemTheme.swift; sourceTree = "<group>"; };
+		8E9E97528B4A647401E6DBDA /* SpeedFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/SpeedFormatter.swift; sourceTree = "<group>"; };
+		F819B14855AE7BF00FE88277 /* SystemSettingsOpener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/SystemSettingsOpener.swift; sourceTree = "<group>"; };
+		8E65A2F6B8537FC59E93100B /* NeManeemFilterDataProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemExtension/NeManeemFilterDataProvider.swift; sourceTree = "<group>"; };
+		430DB9C52DF36A68E28F5615 /* TrafficMeasurementEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemExtension/TrafficMeasurementEngine.swift; sourceTree = "<group>"; };
+		7FE088A129C84EDF1E6EC9DD /* TrafficXPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemExtension/TrafficXPCProtocol.swift; sourceTree = "<group>"; };
+		F2BF0197B32B9DD4F042235A /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemExtension/main.swift; sourceTree = "<group>"; };
+		4DE4FB88B84FA4182B4BFAF5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = App/Info.plist; sourceTree = "<group>"; };
+		AC5B21DF91BCEC17D23AF607 /* NeManeem.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App/NeManeem.entitlements; sourceTree = "<group>"; };
+		985F835A17E85464E7B38DA2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = SystemExtension/Info.plist; sourceTree = "<group>"; };
+		5B53F3954B32DE32ACA1F739 /* NeManeemFilter.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SystemExtension/NeManeemFilter.entitlements; sourceTree = "<group>"; };
+		F1F7785EA33266F614274F3C /* project.yml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = project.yml; sourceTree = "<group>"; };
+		C39E71EF6470A691F38D3254 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
+		AC1359887ACD06B9AFDF66E5 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Resources/AppIcon.icon; sourceTree = "<group>"; };
+		26AFBE155EA129055325774B /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		E67FCF49C0C6F255316445A8 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		63B2DB518955C17F4C2A34E5 /* Combine.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Combine.framework; path = System/Library/Frameworks/Combine.framework; sourceTree = SDKROOT; };
+		6CD70B141F27135DDD16D2B1 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
+		FDA590E255E29F0D2357458D /* CoreWLAN.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreWLAN.framework; path = System/Library/Frameworks/CoreWLAN.framework; sourceTree = SDKROOT; };
+		ED57A73197EF0EB610C51175 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = System/Library/Frameworks/CryptoKit.framework; sourceTree = SDKROOT; };
+		9CE61EDA2E1EB0CC45006D15 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
+		CF67AC72C7D5C57833646D44 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
+		3BC060A62BE87CC1F9436530 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		E7A264E046E127A59F1DE167 /* SystemExtensions.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemExtensions.framework; path = System/Library/Frameworks/SystemExtensions.framework; sourceTree = SDKROOT; };
+		FF486FBD308A9406F69A68AB /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
+		6CA5BE48E896A7E6353A5605 /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8226845DD06A9803C9F1E0E1 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (3354621689C05BFFFA9F29E6, 5660D93CD4DBA08D6CC4FDBF, CB8DFADF2422D2B4F6AE362F, B28E2E229B16940E2846E621, EFC1F9D2E3F58603C41321DC, A21F675AC2EF3F40A07910E4, BF943B20C895E8DBC3597D71, 550234A39305E63096CF552E, 3E466578C8F4DEAF0F7260ED, 05B774280108F42055909D84, 4C29D17192B5DFE8A2FFE65D, 321B6E6469E7307F8D23867C,); runOnlyForDeploymentPostprocessing = 0; };
+		563552C688FE6FC33373EA08 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (67183C56D60F364EC0A221C1, FA490CEDFA67BA07A10C592F,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		6CFC827E67DCAE34C72B9CED = {isa = PBXGroup; children = (1DF401F405384E02A0BF02D3, 8628273F8F56A96723391F22, C39E71EF6470A691F38D3254, AC1359887ACD06B9AFDF66E5, 948E5242286F8ACF1BEA0A06, F1F7785EA33266F614274F3C, 021F2B7F3E0C61452C987484,); sourceTree = "<group>"; };
+		1DF401F405384E02A0BF02D3 /* App Sources */ = {isa = PBXGroup; children = (38058A1CB8AF9F84D236D3F8, 6E20C40AF45A3800BC43C12B, 031353CB3E68F9621B5C634D, A617D7C42B6C2621910D0C6F, 918E976937118B3BC756981E, 92A94BC67DBAF1E642DF07AE, E761F3FAF70595B34D96EAD2, BC6C88B9A99E287CDD2F6AB1, FFAA2538A51C0A57D6048950, 31A1BA8AD52EF4772ADD47AE, 362BB633CF417B64569D3263, 3CC7C7EC2E05E315D569539A, 39C51A36E8964D68BA01089E, F5B42BDEB32EF9A86CF7772B, F0A05EB107EC43DABB497DCE, B9B0B11E16C0ABFA91540043, 133FA314065AC621E4E6914A, F82AC0C3432C31C83BAC33EA, 848B14E05A3EE86C428D4055, CAE542D30640502348546E45, 340163AD71447FC7A756A810, C02F5ABCED203B7D8FD2FB78, FBA23120BED923469B653953, D4C3576F664F7BAED0730CFD, FC970F3A6E7C04D63C2AF8B9, 8927BF67C8646EB01EA3C883, 3AF32DC9C6D06197DDE4F878, 111DDD0A93EC47ACA5FF0054, 1CFD580B39051875FD81F3BC, 6F56EEAE1AB75AF88BE1E326, 8E9E97528B4A647401E6DBDA, F819B14855AE7BF00FE88277, 4DE4FB88B84FA4182B4BFAF5, AC5B21DF91BCEC17D23AF607,); name = "App Sources"; sourceTree = "<group>"; };
+		8628273F8F56A96723391F22 /* SystemExtension */ = {isa = PBXGroup; children = (8E65A2F6B8537FC59E93100B, 430DB9C52DF36A68E28F5615, 7FE088A129C84EDF1E6EC9DD, F2BF0197B32B9DD4F042235A, 985F835A17E85464E7B38DA2, 5B53F3954B32DE32ACA1F739,); name = SystemExtension; sourceTree = "<group>"; };
+		948E5242286F8ACF1BEA0A06 /* Frameworks */ = {isa = PBXGroup; children = (26AFBE155EA129055325774B, E67FCF49C0C6F255316445A8, 63B2DB518955C17F4C2A34E5, 6CD70B141F27135DDD16D2B1, FDA590E255E29F0D2357458D, ED57A73197EF0EB610C51175, 9CE61EDA2E1EB0CC45006D15, CF67AC72C7D5C57833646D44, 3BC060A62BE87CC1F9436530, E7A264E046E127A59F1DE167, FF486FBD308A9406F69A68AB, 6CA5BE48E896A7E6353A5605,); name = Frameworks; sourceTree = "<group>"; };
+		021F2B7F3E0C61452C987484 /* Products */ = {isa = PBXGroup; children = (5718BA8B2965F0F686C8E55B, 4AFAC920BF1630972425D5BB,); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		CCD1BDFE40AA20836710EC01 /* NeManeem */ = {isa = PBXNativeTarget; buildConfigurationList = 6D8FB42965893BD12EA629B4; buildPhases = (DE54E274973760DB10C0103F, 8226845DD06A9803C9F1E0E1, 3073F9BACE8365BB56700AF3, 060C35239F908B8E4EB554F4,); buildRules = (); dependencies = (DE58E2B17C19600779694943,); name = NeManeem; productName = NeManeem; productReference = 5718BA8B2965F0F686C8E55B; productType = "com.apple.product-type.application"; };
+		AC8BAA12C330271C02BB2E90 /* NeManeemFilter */ = {isa = PBXNativeTarget; buildConfigurationList = 239E864FB71DBA69418C0839; buildPhases = (43047C03A05123C157D0F2EE, 563552C688FE6FC33373EA08, E58F1D2CA4F145AF006F2D5C,); buildRules = (); dependencies = (); name = NeManeemFilter; productName = com.bak2ya.NeManeem.Filter; productReference = 4AFAC920BF1630972425D5BB; productType = "com.apple.product-type.system-extension"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		98F54143AB4E86B28C3AFEE0 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = {CCD1BDFE40AA20836710EC01 = {CreatedOnToolsVersion = 16.0; SystemCapabilities = {com.apple.Sandbox = {enabled = 1;};};}; AC8BAA12C330271C02BB2E90 = {CreatedOnToolsVersion = 16.0; SystemCapabilities = {com.apple.Sandbox = {enabled = 1;};};};};}; buildConfigurationList = 2085AFA2AE905A69F4756592; compatibilityVersion = "Xcode 15.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base,); mainGroup = 6CFC827E67DCAE34C72B9CED; productRefGroup = 021F2B7F3E0C61452C987484; projectDirPath = ""; projectRoot = ""; targets = (CCD1BDFE40AA20836710EC01, AC8BAA12C330271C02BB2E90,); };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3073F9BACE8365BB56700AF3 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (28013CB1AAD0E177074237F6, 3B557BEB97A627979EC7EFF2,); runOnlyForDeploymentPostprocessing = 0; };
+		E58F1D2CA4F145AF006F2D5C = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DE54E274973760DB10C0103F = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (13D8521104B081E236625BE8, 7E8E9CD0981E9FDE83DF7A1B, 46D31D36A1663BE5270E8826, A037E52B23AF82417DC889B4, 7DB46D32B436CB9E365F9A39, 1B20FC9AF4358C5B8FC7567C, 5A236B7746AFB8647C5702D8, DAF2AD56590B268C6FCC17EE, A4D9CB52A6BB8779959B1E13, 8A046ECBC1EA9C25D197B9D5, 9B709A7DADA810FD8F3A41B6, B69C74B7CEFA8AD8979AEAA0, 84367DFB6B58CB529320154E, EB0415002705C1D3E497D149, BAD9D00BD6C18C503E2EDB68, C706036A1AF209E91C33C908, 2FFA4E27EC7902F4B92D9362, 1032B1B13F7979CAF4973C7F, E9EFB7788B3463A42426FFF9, C84E9F660A90ED0391FA4B83, F7C368A5F5335F4F2943AD9D, 8B52B633E6E8D4ADFD9CB859, C16C3D47F71F042C4935973B, 5AC87934610AED2C6B6437CB, C47E8392B8AA423F4E84BF5B, AE26C62D19FBC9F277A51094, 173ECB4FD80BEDC48F463638, 1ACA209BD326A61962658E12, FF80F12EA3E3A8414CDF6D85, 9465C32356021FBDA32B6FA1, 3FD6330225067A16148B4BFB, 285DC3DB44D1201DD948345A,); runOnlyForDeploymentPostprocessing = 0; };
+		43047C03A05123C157D0F2EE = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (6E08201C56AFAB743AFB9896, 5706D634B8AC0B19B6FD7A0C, 77C52EAAEE5D943E9DA7D9EE, A808F75DB3ED4BEA7EC80101,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		58B22D68371AC8F11EADCD99 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; REGISTER_APP_GROUPS = YES; ENABLE_HARDENED_RUNTIME = YES; MACOSX_DEPLOYMENT_TARGET = "13.0"; SDKROOT = macosx; SWIFT_VERSION = "5.0"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = dwarf; CODE_SIGN_IDENTITY = "Apple Development";}; name = Debug; };
+		D005BFB4C42D9F64610280D7 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; REGISTER_APP_GROUPS = YES; ENABLE_HARDENED_RUNTIME = YES; MACOSX_DEPLOYMENT_TARGET = "13.0"; SDKROOT = macosx; SWIFT_VERSION = "5.0"; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";}; name = Release; };
+		9303EFBCAFCD82C17933C9EB /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; REGISTER_APP_GROUPS = YES; ENABLE_HARDENED_RUNTIME = YES; MACOSX_DEPLOYMENT_TARGET = "13.0"; SDKROOT = macosx; SWIFT_VERSION = "5.0"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = dwarf; CODE_SIGN_IDENTITY = "Apple Development"; PRODUCT_BUNDLE_IDENTIFIER = "com.bak2ya.NeManeem"; PRODUCT_NAME = NeManeem; INFOPLIST_FILE = "App/Info.plist"; CODE_SIGN_ENTITLEMENTS = "App/NeManeem.entitlements"; GENERATE_INFOPLIST_FILE = NO; ENABLE_APP_SANDBOX = YES; ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES; ENABLE_USER_SELECTED_FILES = readwrite; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; COPY_PHASE_STRIP = NO; STRIP_INSTALLED_PRODUCT = NO;}; name = Debug; };
+		0F8B4C7FB77C768D3A78A504 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; REGISTER_APP_GROUPS = YES; ENABLE_HARDENED_RUNTIME = YES; MACOSX_DEPLOYMENT_TARGET = "13.0"; SDKROOT = macosx; SWIFT_VERSION = "5.0"; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; PRODUCT_BUNDLE_IDENTIFIER = "com.bak2ya.NeManeem"; PRODUCT_NAME = NeManeem; INFOPLIST_FILE = "App/Info.plist"; CODE_SIGN_ENTITLEMENTS = "App/NeManeem.entitlements"; GENERATE_INFOPLIST_FILE = NO; ENABLE_APP_SANDBOX = YES; ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES; ENABLE_USER_SELECTED_FILES = readwrite; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; COPY_PHASE_STRIP = NO; STRIP_INSTALLED_PRODUCT = NO;}; name = Release; };
+		2539B21F1450F066B08C4D97 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; REGISTER_APP_GROUPS = YES; ENABLE_HARDENED_RUNTIME = YES; MACOSX_DEPLOYMENT_TARGET = "13.0"; SDKROOT = macosx; SWIFT_VERSION = "5.0"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; DEBUG_INFORMATION_FORMAT = dwarf; CODE_SIGN_IDENTITY = "Apple Development"; PRODUCT_BUNDLE_IDENTIFIER = "com.bak2ya.NeManeem.Filter"; PRODUCT_NAME = "com.bak2ya.NeManeem.Filter"; INFOPLIST_FILE = "SystemExtension/Info.plist"; CODE_SIGN_ENTITLEMENTS = "SystemExtension/NeManeemFilter.entitlements"; GENERATE_INFOPLIST_FILE = NO; ENABLE_APP_SANDBOX = YES; PRODUCT_MODULE_NAME = NeManeemFilter; MACH_O_TYPE = mh_execute; COPY_PHASE_STRIP = NO; STRIP_INSTALLED_PRODUCT = NO;}; name = Debug; };
+		A54D1F0EAA9C0DA30C89BD94 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; REGISTER_APP_GROUPS = YES; ENABLE_HARDENED_RUNTIME = YES; MACOSX_DEPLOYMENT_TARGET = "13.0"; SDKROOT = macosx; SWIFT_VERSION = "5.0"; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; PRODUCT_BUNDLE_IDENTIFIER = "com.bak2ya.NeManeem.Filter"; PRODUCT_NAME = "com.bak2ya.NeManeem.Filter"; INFOPLIST_FILE = "SystemExtension/Info.plist"; CODE_SIGN_ENTITLEMENTS = "SystemExtension/NeManeemFilter.entitlements"; GENERATE_INFOPLIST_FILE = NO; ENABLE_APP_SANDBOX = YES; PRODUCT_MODULE_NAME = NeManeemFilter; MACH_O_TYPE = mh_execute; COPY_PHASE_STRIP = NO; STRIP_INSTALLED_PRODUCT = NO;}; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2085AFA2AE905A69F4756592 = {isa = XCConfigurationList; buildConfigurations = (58B22D68371AC8F11EADCD99, D005BFB4C42D9F64610280D7,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		6D8FB42965893BD12EA629B4 = {isa = XCConfigurationList; buildConfigurations = (9303EFBCAFCD82C17933C9EB, 0F8B4C7FB77C768D3A78A504,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		239E864FB71DBA69418C0839 = {isa = XCConfigurationList; buildConfigurations = (2539B21F1450F066B08C4D97, A54D1F0EAA9C0DA30C89BD94,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+}

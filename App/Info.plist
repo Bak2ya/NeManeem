@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>NeManeem</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleDisplayName</key>
+	<string>NeManeem</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>129</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSLocationUsageDescription</key>
+	<string>NeManeem uses Location permission only because macOS requires it to identify Wi-Fi names (SSID) for per-network data-limit target selection. It does not read or store your coordinates, and Wi-Fi names are processed only on this Mac.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>NeManeem uses Location permission only because macOS requires it to identify Wi-Fi names (SSID) for per-network data-limit target selection. It does not read or store your coordinates, and Wi-Fi names are processed only on this Mac.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NeManeemTrafficMachServiceName</key>
+	<string>group.com.bak2ya.NeManeem.traffic</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+</dict>
+</plist>

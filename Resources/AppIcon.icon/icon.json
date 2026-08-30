@@ -1,0 +1,57 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "srgb:0.96863,0.98039,1.00000,1.00000",
+      "srgb:0.88627,0.91765,0.96471,1.00000"
+    ],
+    "orientation": {
+      "start": {"x": 0.50, "y": 0.10},
+      "stop": {"x": 0.50, "y": 0.92}
+    }
+  },
+  "fill-specializations": [
+    {
+      "appearance": "dark",
+      "value": {
+        "linear-gradient": [
+          "srgb:0.04314,0.07451,0.16863,1.00000",
+          "srgb:0.01961,0.04314,0.11765,1.00000"
+        ],
+        "orientation": {
+          "start": {"x": 0.50, "y": 0.08},
+          "stop": {"x": 0.50, "y": 0.94}
+        }
+      }
+    }
+  ],
+  "groups": [
+    {
+      "name": "NeManeem Mark",
+      "layers": [
+        {
+          "name": "NeManeem Mark",
+          "image-name": "NeManeemForeground.png",
+          "glass": false,
+          "hidden": false,
+          "position": {
+            "scale": 1.0,
+            "translation-in-points": [0.0, 0.0]
+          }
+        }
+      ],
+      "lighting": "individual",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.18
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0.0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}
