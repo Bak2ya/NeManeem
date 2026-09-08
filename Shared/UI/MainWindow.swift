@@ -5834,6 +5834,7 @@ struct DataLimitSettingsView: View {
                     }
                 }
                 SettingsHelpText(t("specificNetworkScopeHelp"), level: .detail)
+                SettingsHelpText(t("wifiLocationReviewPurpose"))
                 if !selectedNetworkIsConfigured {
                     SettingsHelpText(t("networkSelectionIncompleteHelp"))
                 } else if !selectedNetworkReliable {
@@ -6490,6 +6491,7 @@ struct TroubleshootingSettingsView: View {
     @StateObject private var diagnostics = TroubleshootingService()
     @State private var showingReportWarning = false
     @State private var showingMailUnavailable = false
+    @State private var diagnosticAIConsent = false
 
     private var t: (String) -> String { { L10n.text($0, language: settings.language) } }
 
@@ -6638,6 +6640,11 @@ struct TroubleshootingSettingsView: View {
                                     .foregroundStyle(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
 
+                                Toggle(t("diagnosticAIConsent"), isOn: $diagnosticAIConsent)
+                                    .toggleStyle(.checkbox)
+                                    .font(.callout)
+                                    .fixedSize(horizontal: false, vertical: true)
+
                                 HStack {
                                     Button(t("viewReport")) { diagnostics.openReport() }
                                     Button(t("sendByEmail")) {
@@ -6645,6 +6652,7 @@ struct TroubleshootingSettingsView: View {
                                             showingMailUnavailable = true
                                         }
                                     }
+                                    .disabled(!diagnosticAIConsent)
                                 }
 
                                 VStack(alignment: .leading, spacing: 3) {
@@ -6679,6 +6687,7 @@ struct TroubleshootingSettingsView: View {
         .alert(t("diagnosticReportWarningTitle"), isPresented: $showingReportWarning) {
             Button(t("cancel"), role: .cancel) { }
             Button(t("createReport")) {
+                diagnosticAIConsent = false
                 Task { await diagnostics.generateReport(firewall: firewall, traffic: traffic, interface: interface, knownNetworkCount: recorder.knownNetworks.count) }
             }
         } message: {
@@ -6757,10 +6766,7 @@ struct AboutSettingsView: View {
     // The App Store link uses the permanent App Store Connect Apple ID.
     private let githubURL = URL(string: "https://github.com/Bak2ya/NeManeem")!
     private let appStoreURL = URL(string: "https://apps.apple.com/app/id6806773845")
-
-    // Release gate: voluntary treat support stays implemented but is not exposed
-    // until the user explicitly enables it for a future release.
-    private let treatSupportUIEnabled = false
+    private let privacyPolicyURL = URL(string: "https://github.com/Bak2ya/NeManeem/blob/main/PRIVACY.md")!
 
     private let maneemAssets = [
         "Maneem_5572", "Maneem_5147", "Maneem_5142", "Maneem_5128",
@@ -6846,13 +6852,15 @@ struct AboutSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: 440)
 
-                    Text(t("privacyCompact"))
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: 440)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(t("privacyCompact"))
+                        Text(t("privacyLocationUse"))
+                        Text(t("privacyDiagnosticTransfer"))
+                    }
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 440)
 
                     Text(t("verifyWithAI"))
                         .font(.callout)
@@ -6861,6 +6869,9 @@ struct AboutSettingsView: View {
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: 440)
+
+                    Link(t("privacyPolicy"), destination: privacyPolicyURL)
+                        .font(.callout)
                 }
 
                 Divider()
@@ -6878,25 +6889,12 @@ struct AboutSettingsView: View {
                     VStack(spacing: 8) {
                         releaseLinkButton(imageName: "GitHubInvertocat", title: t("viewOnGitHub"), url: githubURL)
                         releaseLinkButton(systemName: "apple.logo", title: t("viewOnAppStore"), url: appStoreURL)
-                    }
-
-                    if treatSupportUIEnabled {
                         Button {
-                            // A voluntary support purchase can be connected in a future release.
+                            _ = TroubleshootingService.composeSupportEmail()
                         } label: {
-                            Label(t("buyCoffee"), systemImage: "pawprint.fill")
+                            Label(t("contactSupport"), systemImage: "envelope")
                         }
                         .buttonStyle(NMNeutralActionButtonStyle())
-                        .disabled(true)
-                        .help(t("releaseLinkPending"))
-
-                        Text(t("freeForeverTipWelcome"))
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: 440)
                     }
 
                     Text(versionText)
@@ -6911,6 +6909,13 @@ struct AboutSettingsView: View {
                             showBuildNumber.toggle()
                         }
                         .padding(.top, compact ? 1 : 3)
+
+                    Text(t("maneemEasterHint"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 440)
                 }
 
                 Spacer(minLength: edgeSpacing)

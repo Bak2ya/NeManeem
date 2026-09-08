@@ -177,16 +177,15 @@ struct PopoverView: View {
                     .help(t("windowView"))
                     .accessibilityLabel(t("windowView"))
 
-                Button { NSApp.terminate(nil) } label: {
-                    Image(systemName: "power")
-                        .frame(maxWidth: .infinity, minHeight: 22)
-                }
-                .buttonStyle(.borderless)
-                .frame(maxWidth: .infinity)
-                .foregroundStyle(.primary)
-                .contentShape(Rectangle())
-                .help(t("quit"))
-                .accessibilityLabel(t("quit"))
+                Button(t("quit")) { NSApp.terminate(nil) }
+                    .buttonStyle(.borderless)
+                    .frame(maxWidth: .infinity, minHeight: 22)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .contentShape(Rectangle())
+                    .help(t("quit"))
+                    .accessibilityLabel(t("quit"))
             }
             .font(.system(size: 12.5))
             .padding(.horizontal, 10)
@@ -942,13 +941,13 @@ struct AusterityPopoverView: View {
                     .frame(maxWidth: .infinity, minHeight: 22)
                     .foregroundStyle(.primary)
 
-                Button { NSApp.terminate(nil) } label: {
-                    Image(systemName: "power").frame(maxWidth: .infinity, minHeight: 22)
-                }
-                .buttonStyle(.borderless)
-                .frame(maxWidth: .infinity)
-                .foregroundStyle(.primary)
-                .help(t("quit"))
+                Button(t("quit")) { NSApp.terminate(nil) }
+                    .buttonStyle(.borderless)
+                    .frame(maxWidth: .infinity, minHeight: 22)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .help(t("quit"))
             }
             .font(.system(size: 12.5))
             .padding(.horizontal, 10)

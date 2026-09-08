@@ -32,6 +32,8 @@ struct TroubleshootingReport: Identifiable, Equatable {
 
 @MainActor
 final class TroubleshootingService: ObservableObject {
+    static let supportRecipient = "creative2ya@gmail.com"
+
     @Published private(set) var isDiagnosing = false
     @Published private(set) var isCheckingMeasurementEngine = false
     @Published private(set) var isGeneratingReport = false
@@ -125,11 +127,20 @@ final class TroubleshootingService: ObservableObject {
     }
 
     @discardableResult
+    static func composeSupportEmail() -> Bool {
+        guard let service = NSSharingService(named: .composeEmail) else { return false }
+        service.recipients = [supportRecipient]
+        service.subject = "[NeManeem 문의]"
+        service.perform(withItems: ["NeManeem 문의입니다.\n\n" as NSString])
+        return true
+    }
+
+    @discardableResult
     func composeEmail() -> Bool {
         guard let report,
               let service = NSSharingService(named: .composeEmail) else { return false }
 
-        service.recipients = ["creative2ya@gmail.com"]
+        service.recipients = [Self.supportRecipient]
         service.subject = "[NeManeem 오류 보고] v\(report.appVersion) Build \(report.appBuild)"
         service.perform(withItems: [Self.emailBody(report: report) as NSString, report.url])
         return true
