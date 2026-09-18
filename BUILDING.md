@@ -1,28 +1,54 @@
 # Building NeManeem
 
+NeManeem is a native Mac app with a bundled Network Extension / System Extension.
+
 ## Requirements
 
-- macOS 13 or later
-- A recent Xcode release capable of building the included project
-- An Apple development team with the capabilities required by the host app and Network System Extension
+- A Mac running a supported version of macOS
+- A recent version of Xcode
+- macOS 13.0 or later as the deployment target
+- An Apple Developer account if you want to run the extension-backed features locally
 
-## Open and build
+The repository does not rely on a third-party package manager for the app targets.
 
-1. Open `NeManeem.xcodeproj` in Xcode.
-2. Review Signing & Capabilities for both `NeManeem` and `NeManeemFilter`.
-3. If you are not building with the original signing team, select your own development team and provision the required App Group / Network Extension / System Extension capabilities.
-4. Build the project in Xcode.
+## Open the project
 
-For real Network System Extension testing, macOS may require the signed app to run from `/Applications` and may require explicit approval in System Settings.
+1. Clone this repository.
+2. Open `NeManeem.xcodeproj` in Xcode.
+3. Select the `NeManeem` scheme.
+4. Review Signing & Capabilities for both targets:
+   - `NeManeem`
+   - `NeManeemFilter`
+5. Select your own development team before building locally.
 
-## Important capabilities
+## Signing and capabilities
 
-The host app uses App Sandbox, user-selected file access, System Extension installation, Network Extension content filtering, an App Group, and Location permission for Wi-Fi SSID identification.
+The public project includes the source and entitlement declarations used by NeManeem, but Apple provisioning is tied to the developer account that owns the identifiers and capabilities.
 
-The embedded System Extension uses App Sandbox, Network Extension content filtering, and the same App Group.
+The host app uses capabilities including:
 
-## Validation helpers
+- App Sandbox
+- App Groups
+- System Extension installation
+- Network Extension content filtering
+- Location permission for optional Wi-Fi SSID identification
 
-The repository includes check-only scripts used during development, including `VERIFY_PROJECT.command`, `APP_STORE_PREFLIGHT.command`, and `SHOW_APP.command`. Some checks are macOS/Xcode-specific.
+The bundled filter target also uses the Network Extension content-filter capability and the shared App Group.
 
-These scripts do not replace real signed runtime testing of System Extension installation, XPC communication, permissions, or traffic filtering.
+If you are building under a different Apple Developer account, you may need to substitute your own bundle identifiers, App Group identifiers, signing team, and provisioning profiles consistently across the project.
+
+Without the appropriate Apple-granted capabilities and provisioning, the source can still be inspected and parts of the project may compile, but the System Extension / content-filter functionality may not install or run.
+
+## Build
+
+With signing configured:
+
+1. Select the `NeManeem` scheme.
+2. Choose **Product → Build** in Xcode.
+3. Run the app from Xcode.
+
+On first use of extension-backed features, macOS may ask you to approve the required System Extension or permissions.
+
+## App Store build
+
+The App Store release uses the maintainer's distribution signing and provisioning. Those credentials and profiles are intentionally not included in this repository.

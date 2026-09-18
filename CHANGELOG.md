@@ -1,15 +1,30 @@
 # Changelog
 
+Notable changes to NeManeem are recorded here.
+
 ## 1.1.0 — Build 145
 
-- Improved large app-list responsiveness and long-running usage-recording efficiency.
-- Reorganized Usage data/session management and expanded record/summary exports.
-- Added consistent App Information, Finder reveal, and local parent-app grouping actions.
-- Improved macOS Settings, native popover preview, keyboard navigation, and accessibility behavior.
-- Improved Host ↔ Network Extension liveness and fail-open safety for blocking features.
-- Refined Settings selection/accent presentation.
-- Preserved the existing privacy model and Wi-Fi SSID-only Location permission purpose.
+### Added
+
+- Richer app and process information.
+- Reveal in Finder for app/process locations.
+- Optional grouping of related processes under their parent application.
+- Improved record and summary export workflows.
+- Clearer session data management.
+
+### Changed
+
+- Updated the Settings layout for macOS 27.
+- Refined selection states and system accent color behavior throughout Settings.
+- Reorganized the Usage section.
+- Improved responsiveness and usage-recording efficiency, especially on Macs with many applications.
+- Refined Settings, popover previews, keyboard navigation, and accessibility behavior.
+
+### Fixed
+
+- Improved app-limiting reliability and recovery from unexpected connection or System Extension states.
+- General stability and UI consistency improvements.
 
 ## 1.0.0 — Build 134
 
-- First App Store release.
+- Initial App Store release.
