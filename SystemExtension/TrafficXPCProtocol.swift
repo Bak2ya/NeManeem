@@ -5,4 +5,7 @@ import Foundation
 @objc(NeManeemTrafficXPCProtocol)
 protocol NeManeemTrafficXPCProtocol {
     func fetchTrafficSnapshot(withReply reply: @escaping (Data) -> Void)
+    /// Lightweight Host liveness signal. Normal snapshot requests count as the
+    /// same signal, so this is used only when blocking is active and traffic UI is idle.
+    func reportHostLiveness(withReply reply: @escaping () -> Void)
 }

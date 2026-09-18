@@ -15,7 +15,7 @@ private struct StatusTableMetrics {
         case .process: return processWidth
         case .download, .upload: return metricWidth
         case .today, .week, .month, .session, .dataCycle: return usageWidth
-        case .block: return controlWidth
+        case .allowed: return controlWidth
         }
     }
 
@@ -63,7 +63,7 @@ private func statusTableMetrics(processMode: ProcessDisplayMode,
         processWidth = max(92 * scale, nameBudget + disclosure + icon + internalGaps)
     }
 
-    let blockWidth = max(42 * scale, statusTextWidth(t("block"), size: headerSize, weight: .medium) + 8)
+    let blockWidth = max(42 * scale, statusTextWidth(t("allowed"), size: headerSize, weight: .medium) + 8)
     return StatusTableMetrics(processWidth: ceil(processWidth),
                               metricWidth: ceil(metricText + 6),
                               usageWidth: ceil(usageText + 6),
@@ -115,8 +115,9 @@ struct PopoverView: View {
 
     private var t: (String) -> String { { L10n.text($0, language: settings.language) } }
     private var scale: CGFloat { settings.popoverScale.factor }
+    private var displayColumns: [StatusColumn] { activeStatusColumns(settings.popoverColumns, appBlockingEnabled: firewall.isEnabled) }
     private var popoverWidth: CGFloat {
-        statusWindowRecommendedWidth(columns: settings.popoverColumns,
+        statusWindowRecommendedWidth(columns: displayColumns,
                                      processMode: settings.popoverProcessDisplay,
                                      unitMode: settings.popoverUnitMode,
                                      directionDisplay: settings.popoverDirectionDisplay,
@@ -143,7 +144,7 @@ struct PopoverView: View {
                                   unitMode: settings.popoverUnitMode,
                                   directionDisplay: settings.popoverDirectionDisplay,
                                   scale: scale,
-                                  columns: settings.popoverColumns)
+                                  columns: displayColumns)
                 Divider()
             }
 
@@ -161,14 +162,14 @@ struct PopoverView: View {
                     Image(systemName: "gearshape")
                         .frame(maxWidth: .infinity, minHeight: 22)
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(NMInlineActionButtonStyle())
                 .frame(maxWidth: .infinity)
                 .foregroundStyle(.primary)
                 .help(t("settings"))
                 .accessibilityLabel(t("settings"))
 
                 Button(t("windowMode")) { openMainWindow(.monitor) }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(NMInlineActionButtonStyle())
                     .frame(maxWidth: .infinity)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -178,7 +179,7 @@ struct PopoverView: View {
                     .accessibilityLabel(t("windowView"))
 
                 Button(t("quit")) { NSApp.terminate(nil) }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(NMInlineActionButtonStyle())
                     .frame(maxWidth: .infinity, minHeight: 22)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -227,7 +228,7 @@ struct PopoverView: View {
         rateBaselineDate = Date()
         if preserveRates {
             displayedUsages = usages
-            lowActivityTracker.record(usages: usages, at: Date(), retention: lowActivityWindowSeconds)
+            lowActivityTracker.record(usages: applyingManualParentMappings(usages, mappings: settings.manualParentAppMappings), at: Date(), retention: lowActivityWindowSeconds)
             updateStableUsageOrder(using: displayedUsages)
         } else {
             displayedUsages = usages.map {
@@ -244,7 +245,7 @@ struct PopoverView: View {
                                 lastActiveAt: $0.lastActiveAt)
             }
             lowActivityTracker.reset()
-            lowActivityTracker.record(usages: usages, at: Date(), retention: lowActivityWindowSeconds)
+            lowActivityTracker.record(usages: applyingManualParentMappings(usages, mappings: settings.manualParentAppMappings), at: Date(), retention: lowActivityWindowSeconds)
             updateStableUsageOrder(using: displayedUsages)
         }
     }
@@ -267,7 +268,7 @@ struct PopoverView: View {
             // averaged across a long idle period.
             guard elapsed >= max(interval, 0.75) else { return }
             displayedUsages = resampledAppNetworkUsages(usages, from: rateBaseline, elapsed: elapsed)
-            lowActivityTracker.record(usages: usages, at: now, retention: lowActivityWindowSeconds)
+            lowActivityTracker.record(usages: applyingManualParentMappings(usages, mappings: settings.manualParentAppMappings), at: now, retention: lowActivityWindowSeconds)
             updateStableUsageOrder(using: displayedUsages)
             rateBaseline = appUsageCounterBaseline(usages)
             rateBaselineDate = now
@@ -276,7 +277,7 @@ struct PopoverView: View {
 
         guard elapsed >= interval else { return }
         displayedUsages = resampledAppNetworkUsages(usages, from: rateBaseline, elapsed: elapsed)
-        lowActivityTracker.record(usages: usages, at: now, retention: lowActivityWindowSeconds)
+        lowActivityTracker.record(usages: applyingManualParentMappings(usages, mappings: settings.manualParentAppMappings), at: now, retention: lowActivityWindowSeconds)
         updateStableUsageOrder(using: displayedUsages)
         rateBaseline = appUsageCounterBaseline(usages)
         rateBaselineDate = now
@@ -289,7 +290,7 @@ struct PopoverView: View {
                 unitMode: settings.popoverUnitMode,
                 directionDisplay: settings.popoverDirectionDisplay,
                 scale: scale,
-                columns: settings.popoverColumns
+                columns: displayColumns
             )
             Divider()
 
@@ -364,7 +365,7 @@ struct PopoverView: View {
                                             unitMode: settings.popoverUnitMode,
                                             directionDisplay: settings.popoverDirectionDisplay,
                                             scale: scale,
-                                            columns: settings.popoverColumns,
+                                            columns: displayColumns,
                                             scope: mainTrafficScope)
                             Divider().padding(.leading, processDividerInset)
                             if systemExpanded {
@@ -377,7 +378,7 @@ struct PopoverView: View {
 
                         if !lowActivityAppGroups.isEmpty {
                             let usages = lowActivityAppGroups.map(\.usage)
-                            TrafficGroupRow(title: t("lowActivityApps"), count: usages.count, usages: usages, isExpanded: $lowActivityExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: settings.popoverColumns, scope: mainTrafficScope)
+                            TrafficGroupRow(title: t("lowActivityApps"), count: usages.count, usages: usages, isExpanded: $lowActivityExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: displayColumns, scope: mainTrafficScope)
                             Divider().padding(.leading, processDividerInset)
                             if lowActivityExpanded {
                                 ForEach(lowActivityAppGroups.sorted { $0.usage.displayName.localizedCaseInsensitiveCompare($1.usage.displayName) == .orderedAscending }) { group in
@@ -389,7 +390,7 @@ struct PopoverView: View {
 
                         if !unselectedAppGroups.isEmpty {
                             let usages = unselectedAppGroups.map(\.usage)
-                            TrafficGroupRow(title: t("otherApps"), count: usages.count, usages: usages, isExpanded: $unselectedExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: settings.popoverColumns, scope: mainTrafficScope)
+                            TrafficGroupRow(title: t("otherApps"), count: usages.count, usages: usages, isExpanded: $unselectedExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: displayColumns, scope: mainTrafficScope)
                             Divider().padding(.leading, processDividerInset)
                             if unselectedExpanded {
                                 ForEach(unselectedAppGroups.sorted { $0.usage.displayName.localizedCaseInsensitiveCompare($1.usage.displayName) == .orderedAscending }) { group in
@@ -401,7 +402,7 @@ struct PopoverView: View {
 
                         if !hiddenAppGroups.isEmpty {
                             let usages = hiddenAppGroups.map(\.usage)
-                            TrafficGroupRow(title: t("hiddenApps"), count: usages.count, usages: usages, isExpanded: $hiddenExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: settings.popoverColumns, scope: mainTrafficScope)
+                            TrafficGroupRow(title: t("hiddenApps"), count: usages.count, usages: usages, isExpanded: $hiddenExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: displayColumns, scope: mainTrafficScope)
                             Divider().padding(.leading, processDividerInset)
                             if hiddenExpanded {
                                 ForEach(hiddenAppGroups.sorted { $0.usage.displayName.localizedCaseInsensitiveCompare($1.usage.displayName) == .orderedAscending }) { group in
@@ -413,7 +414,7 @@ struct PopoverView: View {
 
                         if shouldShowLocalGroup && !localNetworkGroups.isEmpty {
                             let usages = localNetworkGroups.map(\.usage)
-                            TrafficGroupRow(title: t("localNetwork"), count: usages.count, usages: usages, isExpanded: $localExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: settings.popoverColumns, scope: .local)
+                            TrafficGroupRow(title: t("localNetwork"), count: usages.count, usages: usages, isExpanded: $localExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: displayColumns, scope: .local)
                             Divider().padding(.leading, processDividerInset)
                             if localExpanded {
                                 ForEach(localNetworkGroups.sorted { $0.usage.displayName.localizedCaseInsensitiveCompare($1.usage.displayName) == .orderedAscending }) { group in
@@ -425,7 +426,7 @@ struct PopoverView: View {
 
                         if shouldShowUnknownGroup && !unknownNetworkGroups.isEmpty {
                             let usages = unknownNetworkGroups.map(\.usage)
-                            TrafficGroupRow(title: t("unclassifiedNetwork"), count: usages.count, usages: usages, isExpanded: $unknownExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: settings.popoverColumns, scope: .unknown)
+                            TrafficGroupRow(title: t("unclassifiedNetwork"), count: usages.count, usages: usages, isExpanded: $unknownExpanded, processMode: settings.popoverProcessDisplay, unitMode: settings.popoverUnitMode, directionDisplay: settings.popoverDirectionDisplay, scale: scale, columns: displayColumns, scope: .unknown)
                             Divider().padding(.leading, processDividerInset)
                             if unknownExpanded {
                                 ForEach(unknownNetworkGroups.sorted { $0.usage.displayName.localizedCaseInsensitiveCompare($1.usage.displayName) == .orderedAscending }) { group in
@@ -439,6 +440,7 @@ struct PopoverView: View {
             }
         }
     }
+
 
     @ViewBuilder
     private func trafficRow(_ usage: AppNetworkUsage,
@@ -455,7 +457,7 @@ struct PopoverView: View {
             unitMode: settings.popoverUnitMode,
             directionDisplay: settings.popoverDirectionDisplay,
             scale: scale,
-            columns: settings.popoverColumns,
+            columns: displayColumns,
             scope: scope ?? mainTrafficScope,
             indent: indented ? 14 : 0,
             disclosureExpanded: disclosureExpanded,
@@ -472,10 +474,8 @@ struct PopoverView: View {
         }
         .contentShape(Rectangle())
         .contextMenu {
-                if let location = AppLocationResolver.resolve(usage, preferProcess: false) {
-                    Button(t("revealAppInFinder")) { AppLocationResolver.reveal(location) }
-                    Divider()
-                }
+            AppIdentityContextMenuContent(usage: usage, preferProcess: false)
+            Divider()
             if expertFeaturesActive {
                 Button(t("copyInformation")) { copyUsageInformation(usage, preferProcess: false) }
                 Divider()
@@ -536,19 +536,15 @@ struct PopoverView: View {
                                unitMode: settings.popoverUnitMode,
                                directionDisplay: settings.popoverDirectionDisplay,
                                scale: scale,
-                               columns: settings.popoverColumns,
+                               columns: displayColumns,
                                scope: scope ?? mainTrafficScope,
                                indent: 22,
                                isProcessDetail: true,
                                allowsBlocking: false)
                     .contentShape(Rectangle())
                     .contextMenu {
-                        if let location = AppLocationResolver.resolve(member, preferProcess: true) {
-                            Button(location.isProcessSpecific ? t("revealProcessInFinder") : t("revealAppInFinder")) {
-                                AppLocationResolver.reveal(location)
-                            }
-                            Divider()
-                        }
+                        AppIdentityContextMenuContent(usage: member, preferProcess: true)
+                        Divider()
                         Button(t("copyInformation")) { copyUsageInformation(member, preferProcess: true) }
                         if expertProcessControlsEnabled {
                             Divider()
@@ -561,12 +557,17 @@ struct PopoverView: View {
     }
 
     private var activeFilteredUsages: [AppNetworkUsage] {
-        guard settings.popoverHideInactiveApps else { return displayedUsages }
-        let seconds = SettingsStore.normalizeInactiveHideDelay(settings.popoverInactiveHideDelaySeconds)
-        return displayedUsages.filter { usage in
-            if usage.isActive { return true }
-            return visibilityClock.timeIntervalSince(usage.lastActiveAt) <= seconds
+        let base: [AppNetworkUsage]
+        if settings.popoverHideInactiveApps {
+            let seconds = SettingsStore.normalizeInactiveHideDelay(settings.popoverInactiveHideDelaySeconds)
+            base = displayedUsages.filter { usage in
+                if usage.isActive { return true }
+                return visibilityClock.timeIntervalSince(usage.lastActiveAt) <= seconds
+            }
+        } else {
+            base = displayedUsages
         }
+        return applyingManualParentMappings(base, mappings: settings.manualParentAppMappings)
     }
 
     private var selectedProcessIDs: Set<String> { Set(settings.popoverSelectedProcessIDs) }
@@ -586,8 +587,12 @@ struct PopoverView: View {
         return transferred <= lowActivityThresholdBytes
     }
 
+    private var activeClassifiedUsages: AppSystemUsageSplit {
+        splitAppAndSystemUsages(activeFilteredUsages)
+    }
+
     private var activeAppGroups: [AppUsageGroup] {
-        appUsageGroups(activeFilteredUsages.filter { !$0.isSystemProcess })
+        appUsageGroups(activeClassifiedUsages.apps)
     }
 
     private var hiddenAppGroups: [AppUsageGroup] {
@@ -597,8 +602,7 @@ struct PopoverView: View {
 
     private var rawSystemUsages: [AppNetworkUsage] {
         guard settings.popoverGroupSystemProcesses else { return [] }
-        return activeFilteredUsages.filter { usage in
-            guard usage.isSystemProcess else { return false }
+        return activeClassifiedUsages.systemServices.filter { usage in
             if settings.popoverVisibilityMode == .selectedOnly {
                 return isAppUsageSelected(usage, selectedIDs: selectedProcessIDs)
             }
@@ -608,8 +612,7 @@ struct PopoverView: View {
 
     private var rawUngroupedSystemUsages: [AppNetworkUsage] {
         guard !settings.popoverGroupSystemProcesses else { return [] }
-        return activeFilteredUsages.filter { usage in
-            guard usage.isSystemProcess else { return false }
+        return activeClassifiedUsages.systemServices.filter { usage in
             if settings.popoverVisibilityMode == .selectedOnly {
                 return isAppUsageSelected(usage, selectedIDs: selectedProcessIDs)
             }
@@ -664,7 +667,7 @@ struct PopoverView: View {
     }
 
     private func updateStableUsageOrder(using usages: [AppNetworkUsage]) {
-        let groups = appUsageGroups(usages.filter { !$0.isSystemProcess })
+        let groups = appUsageGroups(splitAppAndSystemUsages(usages).apps)
         let previous = Dictionary(uniqueKeysWithValues: stableUsageOrder.enumerated().map { ($0.element, $0.offset) })
         stableUsageOrder = groups.sorted { lhs, rhs in
             let lb = usageActivityBand(lhs.usage.totalBytesPerSecond)
@@ -850,8 +853,8 @@ struct TrafficTableHeader: View {
         case .month: usageHeader("thisMonth")
         case .session: usageHeader("session")
         case .dataCycle: usageHeader("dataCycle")
-        case .block:
-            Text(t("block")).frame(width: metrics.controlWidth, alignment: .center)
+        case .allowed:
+            Text(t("allowed")).frame(width: metrics.controlWidth, alignment: .center)
         }
     }
 
@@ -931,18 +934,18 @@ struct AusterityPopoverView: View {
                 Button { openMainWindow(.standard) } label: {
                     Image(systemName: "gearshape").frame(maxWidth: .infinity, minHeight: 22)
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(NMInlineActionButtonStyle())
                 .frame(maxWidth: .infinity)
                 .foregroundStyle(.primary)
                 .help(t("settings"))
 
                 Button(t("windowMode")) { openMainWindow(.monitor) }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(NMInlineActionButtonStyle())
                     .frame(maxWidth: .infinity, minHeight: 22)
                     .foregroundStyle(.primary)
 
                 Button(t("quit")) { NSApp.terminate(nil) }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(NMInlineActionButtonStyle())
                     .frame(maxWidth: .infinity, minHeight: 22)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -1136,7 +1139,7 @@ struct TrafficSummaryRow: View {
                 .minimumScaleFactor(0.78)
                 .monospacedDigit()
                 .frame(width: metrics.usageWidth, alignment: .trailing)
-        case .block:
+        case .allowed:
             Color.clear.frame(width: metrics.controlWidth, height: 1)
         }
     }
@@ -1217,17 +1220,17 @@ struct LiveTrafficRow: View {
             speedCell(scopedUpload)
         case .today, .week, .month, .session, .dataCycle:
             usageCell(column)
-        case .block:
+        case .allowed:
             Group {
                 if allowsBlocking, usage.bundleIdentifier != nil {
                     Toggle("", isOn: Binding(
-                        get: { firewall.isBlocked(usage.bundleIdentifier) },
-                        set: { blocked in firewall.setAllowed(!blocked, bundleIdentifier: usage.bundleIdentifier) }
+                        get: { firewall.isAllowed(usage.bundleIdentifier) },
+                        set: { allowed in firewall.setAllowed(allowed, bundleIdentifier: usage.bundleIdentifier) }
                     ))
                     .labelsHidden().toggleStyle(.switch)
                     .controlSize(scale > 1.15 ? .regular : .small)
                     .disabled(!firewall.isEnabled || firewall.isBusy)
-                    .help(firewall.isEnabled ? t("block") : t("enableFilter"))
+                    .help(t("allowed"))
                 } else { Text("—").foregroundStyle(.tertiary) }
             }
             .frame(width: metrics.controlWidth, alignment: .center)
@@ -1336,14 +1339,17 @@ struct TrafficGroupRow: View {
     var expandProcessColumn: Bool = false
 
     var body: some View {
-        HStack(spacing: metrics.spacing) {
-            ForEach(columns) { column in groupCell(column) }
+        Button { isExpanded.toggle() } label: {
+            HStack(spacing: metrics.spacing) {
+                ForEach(columns) { column in groupCell(column) }
+            }
+            .font(.system(size: 12.5 * scale, weight: .medium))
+            .padding(.horizontal, metrics.horizontalPadding)
+            .frame(minHeight: 30 * scale)
+            .contentShape(Rectangle())
         }
-        .font(.system(size: 12.5 * scale, weight: .medium))
-        .padding(.horizontal, metrics.horizontalPadding)
-        .frame(minHeight: 30 * scale)
-        .contentShape(Rectangle())
-        .onTapGesture { isExpanded.toggle() }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
     @ViewBuilder private func groupCell(_ column: StatusColumn) -> some View {
@@ -1384,7 +1390,7 @@ struct TrafficGroupRow: View {
                 Text(SpeedFormatter.statusBytes(total)).lineLimit(1).minimumScaleFactor(0.78).monospacedDigit()
                     .frame(width: metrics.usageWidth, alignment: .trailing)
             }
-        case .block:
+        case .allowed:
             Text("—").foregroundStyle(.tertiary).frame(width: metrics.controlWidth, alignment: .center)
         }
     }

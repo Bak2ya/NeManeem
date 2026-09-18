@@ -20,6 +20,8 @@ final class UsageRecorder: ObservableObject {
     private var previousProcessTotals: [String: AppBytePair] = [:]
     private var previousDetailProcessTotals: [String: AppBytePair] = [:]
     private var lastPersist = Date.distantPast
+    private var lastArchivedMinute: Date?
+    private var usesIncrementalHistoryStore = false
     private let calendar = Calendar.current
     private let alertDefaults = UserDefaults.standard
     private var appPeriodCache: [StatusColumn: [String: AppBytePair]] = [:]
@@ -181,6 +183,8 @@ final class UsageRecorder: ObservableObject {
         let sessionRecords: [UsageSessionRecord]
         let activeSessionState: ActiveUsageSessionState?
         let historyFileSize: UInt64
+        let lastArchivedMinute: Date?
+        let usesIncrementalHistoryStore: Bool
     }
 
     /// Build 50 launch rule: disk history is restored only after the visible menu-bar
@@ -195,6 +199,8 @@ final class UsageRecorder: ObservableObject {
         if !discardDeferredHistory {
             buckets = loaded.buckets
             storedFileSize = loaded.historyFileSize
+            lastArchivedMinute = loaded.lastArchivedMinute
+            usesIncrementalHistoryStore = loaded.usesIncrementalHistoryStore
         }
         if !discardDeferredDataUsageRecords {
             dataUsageRecords = loaded.dataUsageRecords
@@ -282,18 +288,35 @@ final class UsageRecorder: ObservableObject {
 
     private nonisolated static func loadPersistedStateFromDisk() -> DeferredLoadedState {
         guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            return DeferredLoadedState(buckets: [], dataUsageRecords: [], sessionRecords: [], activeSessionState: nil, historyFileSize: 0)
+            return DeferredLoadedState(buckets: [], dataUsageRecords: [], sessionRecords: [], activeSessionState: nil, historyFileSize: 0, lastArchivedMinute: nil, usesIncrementalHistoryStore: false)
         }
         let folder = base.appendingPathComponent("NeManeem", isDirectory: true)
-        let historyURL = folder.appendingPathComponent("usage-history.json")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let legacyHistoryURL = folder.appendingPathComponent("usage-history.json")
+        let archiveURL = folder.appendingPathComponent("usage-history-v2.jsonl")
+        let activeURL = folder.appendingPathComponent("usage-history-active.json")
         let recordsURL = folder.appendingPathComponent("data-usage-records.json")
         let sessionsURL = folder.appendingPathComponent("usage-sessions.json")
         let decoder = JSONDecoder()
 
-        let buckets: [UsageBucket]
-        if let data = try? Data(contentsOf: historyURL), let decoded = try? decoder.decode([UsageBucket].self, from: data) {
+        var usesIncrementalStore = FileManager.default.fileExists(atPath: archiveURL.path)
+        var buckets: [UsageBucket] = []
+        var lastArchivedMinute: Date?
+
+        if usesIncrementalStore {
+            let loaded = loadIncrementalHistory(archiveURL: archiveURL, activeURL: activeURL)
+            buckets = loaded.buckets
+            lastArchivedMinute = loaded.lastArchivedMinute
+        } else if let data = try? Data(contentsOf: legacyHistoryURL),
+                  let decoded = try? decoder.decode([UsageBucket].self, from: data) {
             buckets = decoded
-        } else { buckets = [] }
+            if migrateLegacyHistory(decoded, legacyURL: legacyHistoryURL, archiveURL: archiveURL, activeURL: activeURL) {
+                usesIncrementalStore = true
+                let loaded = loadIncrementalHistory(archiveURL: archiveURL, activeURL: activeURL)
+                buckets = loaded.buckets
+                lastArchivedMinute = loaded.lastArchivedMinute
+            }
+        }
 
         let records: [DataUsageRecord]
         if let data = try? Data(contentsOf: recordsURL), let decoded = try? decoder.decode([DataUsageRecord].self, from: data) {
@@ -304,12 +327,97 @@ final class UsageRecorder: ObservableObject {
         if let data = try? Data(contentsOf: sessionsURL) {
             archive = try? decoder.decode(SessionArchive.self, from: data)
         } else { archive = nil }
-        let size = UInt64((try? historyURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+
+        let size: UInt64
+        if usesIncrementalStore {
+            size = fileSize(archiveURL) &+ fileSize(activeURL)
+        } else {
+            size = fileSize(legacyHistoryURL)
+        }
         return DeferredLoadedState(buckets: buckets,
                                    dataUsageRecords: records,
                                    sessionRecords: archive?.records ?? [],
                                    activeSessionState: archive?.active,
-                                   historyFileSize: size)
+                                   historyFileSize: size,
+                                   lastArchivedMinute: lastArchivedMinute,
+                                   usesIncrementalHistoryStore: usesIncrementalStore)
+    }
+
+    private nonisolated static func fileSize(_ url: URL) -> UInt64 {
+        UInt64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+    }
+
+    private nonisolated static func loadIncrementalHistory(archiveURL: URL, activeURL: URL) -> (buckets: [UsageBucket], lastArchivedMinute: Date?) {
+        let decoder = JSONDecoder()
+        var archived: [UsageBucket] = []
+        if let data = try? Data(contentsOf: archiveURL), !data.isEmpty {
+            for line in data.split(separator: 0x0A) where !line.isEmpty {
+                if let bucket = try? decoder.decode(UsageBucket.self, from: Data(line)) {
+                    archived.append(bucket)
+                }
+            }
+        }
+
+        var active: [UsageBucket] = []
+        if let data = try? Data(contentsOf: activeURL),
+           let decoded = try? decoder.decode([UsageBucket].self, from: data) {
+            active = decoded
+        }
+
+        // If the process stopped between appending a completed minute and refreshing
+        // the tiny active file, the same slice can exist in both places. The archived
+        // copy is newer/final in that sequence, so let it win during recovery.
+        var byID: [String: UsageBucket] = [:]
+        for bucket in archived { byID[bucket.id] = bucket }
+        for bucket in active where byID[bucket.id] == nil { byID[bucket.id] = bucket }
+        let combined = byID.values.sorted { lhs, rhs in
+            if lhs.start != rhs.start { return lhs.start < rhs.start }
+            return (lhs.networkIdentifier ?? "") < (rhs.networkIdentifier ?? "")
+        }
+        return (combined, archived.map(\.start).max())
+    }
+
+    private nonisolated static func migrateLegacyHistory(_ buckets: [UsageBucket], legacyURL: URL, archiveURL: URL, activeURL: URL) -> Bool {
+        guard writeIncrementalSnapshot(buckets, archiveURL: archiveURL, activeURL: activeURL) else { return false }
+        let verified = loadIncrementalHistory(archiveURL: archiveURL, activeURL: activeURL).buckets
+        let expected = buckets.sorted { lhs, rhs in
+            if lhs.start != rhs.start { return lhs.start < rhs.start }
+            return (lhs.networkIdentifier ?? "") < (rhs.networkIdentifier ?? "")
+        }
+        guard verified == expected else {
+            try? FileManager.default.removeItem(at: archiveURL)
+            try? FileManager.default.removeItem(at: activeURL)
+            return false
+        }
+        // Only remove the legacy whole-array file after a full round-trip check.
+        try? FileManager.default.removeItem(at: legacyURL)
+        return true
+    }
+
+    private nonisolated static func writeIncrementalSnapshot(_ buckets: [UsageBucket], archiveURL: URL, activeURL: URL) -> Bool {
+        let encoder = JSONEncoder()
+        let currentMinute = Calendar.current.dateInterval(of: .minute, for: Date())?.start ?? Date()
+        let archived = buckets.filter { $0.start < currentMinute }.sorted { lhs, rhs in
+            if lhs.start != rhs.start { return lhs.start < rhs.start }
+            return (lhs.networkIdentifier ?? "") < (rhs.networkIdentifier ?? "")
+        }
+        let active = buckets.filter { $0.start >= currentMinute }
+        var archiveData = Data()
+        for bucket in archived {
+            guard let row = try? encoder.encode(bucket) else { return false }
+            archiveData.append(row)
+            archiveData.append(0x0A)
+        }
+        guard let activeData = try? encoder.encode(active) else { return false }
+        do {
+            // Write the small recovery file first. The archive file is the v2 marker,
+            // so a failed migration can never make a partial store look complete.
+            try activeData.write(to: activeURL, options: .atomic)
+            try archiveData.write(to: archiveURL, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
     }
 
     var sessionTotal: AppBytePair {
@@ -453,7 +561,7 @@ final class UsageRecorder: ObservableObject {
             return sessionTotal
         case .dataCycle:
             return currentCycleTotal
-        case .process, .download, .upload, .block:
+        case .process, .download, .upload, .allowed:
             return AppBytePair()
         }
     }
@@ -861,7 +969,7 @@ final class UsageRecorder: ObservableObject {
         buckets = []
         appPeriodCache.removeAll()
         totalPeriodCache.removeAll()
-        persist()
+        rewriteIncrementalHistoryStore()
     }
 
     func exportCSV(from start: Date, to end: Date, intervalMinutes: Int, destination: URL) throws {
@@ -878,6 +986,12 @@ final class UsageRecorder: ObservableObject {
     func exportXLSX(from start: Date, to end: Date, intervalMinutes: Int, includeSummary: Bool = true, destination: URL) throws {
         let aggregate = total(from: start, to: end)
         try XLSXExporter.export(rows: exportRows(from: start, to: end), total: aggregate, start: start, end: end, includeSummary: includeSummary, destination: destination)
+    }
+
+
+    func exportCSVWithSummaryBundle(from start: Date, to end: Date, intervalMinutes: Int, destination: URL) throws {
+        let aggregate = total(from: start, to: end)
+        try XLSXExporter.exportCSVBundle(rows: exportRows(from: start, to: end), total: aggregate, start: start, end: end, destination: destination)
     }
 
     func exportDataUsageRecordsCSV(_ records: [DataUsageRecord], destination: URL) throws {
@@ -1476,8 +1590,15 @@ final class UsageRecorder: ObservableObject {
         }
         if settings.dataLimitEnabled { cutoff = min(cutoff, currentDataCycleStart()) }
         if settings.sessionEnabled { cutoff = min(cutoff, settings.sessionStartDate) }
+        let previousCount = buckets.count
         buckets.removeAll { $0.start < cutoff }
-        if force { persist() }
+        if force {
+            if buckets.count != previousCount {
+                rewriteIncrementalHistoryStore()
+            } else {
+                persist()
+            }
+        }
     }
 
 
@@ -1573,8 +1694,16 @@ final class UsageRecorder: ObservableObject {
         try? data.write(to: url, options: .atomic)
     }
 
-    private var fileURL: URL? {
+    private var legacyHistoryURL: URL? {
         applicationSupportFolder?.appendingPathComponent("usage-history.json")
+    }
+
+    private var historyArchiveURL: URL? {
+        applicationSupportFolder?.appendingPathComponent("usage-history-v2.jsonl")
+    }
+
+    private var activeHistoryURL: URL? {
+        applicationSupportFolder?.appendingPathComponent("usage-history-active.json")
     }
 
     private var applicationSupportFolder: URL? {
@@ -1585,14 +1714,93 @@ final class UsageRecorder: ObservableObject {
     }
 
     private func persist() {
-        guard let url = fileURL, let data = try? JSONEncoder().encode(buckets) else { return }
-        try? data.write(to: url, options: .atomic)
+        guard let archiveURL = historyArchiveURL, let activeURL = activeHistoryURL else { return }
+        if !usesIncrementalHistoryStore {
+            if Self.writeIncrementalSnapshot(buckets, archiveURL: archiveURL, activeURL: activeURL) {
+                usesIncrementalHistoryStore = true
+                lastArchivedMinute = buckets.filter { $0.start < currentMinuteStart }.map(\.start).max()
+                if let legacyHistoryURL { try? FileManager.default.removeItem(at: legacyHistoryURL) }
+            } else {
+                persistLegacyFallback()
+                return
+            }
+        } else {
+            appendCompletedHistory(to: archiveURL)
+            persistActiveHistory(to: activeURL)
+        }
         lastPersist = Date()
-        updateFileSize(url)
+        updateStoredFileSize()
     }
 
-    private func updateFileSize(_ url: URL) {
-        let values = try? url.resourceValues(forKeys: [.fileSizeKey])
-        storedFileSize = UInt64(values?.fileSize ?? 0)
+    private var currentMinuteStart: Date {
+        calendar.dateInterval(of: .minute, for: Date())?.start ?? Date()
     }
+
+    private func appendCompletedHistory(to archiveURL: URL) {
+        let cutoff = currentMinuteStart
+        let pending = buckets.filter { bucket in
+            bucket.start < cutoff && (lastArchivedMinute == nil || bucket.start > lastArchivedMinute!)
+        }.sorted { lhs, rhs in
+            if lhs.start != rhs.start { return lhs.start < rhs.start }
+            return (lhs.networkIdentifier ?? "") < (rhs.networkIdentifier ?? "")
+        }
+        guard !pending.isEmpty else { return }
+
+        let encoder = JSONEncoder()
+        var data = Data()
+        for bucket in pending {
+            guard let row = try? encoder.encode(bucket) else { return }
+            data.append(row)
+            data.append(0x0A)
+        }
+        do {
+            if !FileManager.default.fileExists(atPath: archiveURL.path) {
+                try Data().write(to: archiveURL, options: .atomic)
+            }
+            let handle = try FileHandle(forWritingTo: archiveURL)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: data)
+            try handle.close()
+            lastArchivedMinute = pending.last?.start
+        } catch {
+            // Keep lastArchivedMinute unchanged so the same finalized rows are retried
+            // on the next persistence pass instead of silently skipping them.
+        }
+    }
+
+    private func persistActiveHistory(to activeURL: URL) {
+        // Normally this is only the current minute. If appending finalized rows ever
+        // fails, keep every not-yet-archived bucket here so a restart cannot lose it.
+        let active = buckets.filter { bucket in
+            lastArchivedMinute == nil || bucket.start > lastArchivedMinute!
+        }
+        guard let data = try? JSONEncoder().encode(active) else { return }
+        try? data.write(to: activeURL, options: .atomic)
+    }
+
+    private func rewriteIncrementalHistoryStore() {
+        guard let archiveURL = historyArchiveURL, let activeURL = activeHistoryURL else { return }
+        guard Self.writeIncrementalSnapshot(buckets, archiveURL: archiveURL, activeURL: activeURL) else {
+            persistLegacyFallback()
+            return
+        }
+        usesIncrementalHistoryStore = true
+        lastArchivedMinute = buckets.filter { $0.start < currentMinuteStart }.map(\.start).max()
+        if let legacyHistoryURL { try? FileManager.default.removeItem(at: legacyHistoryURL) }
+        lastPersist = Date()
+        updateStoredFileSize()
+    }
+
+    private func persistLegacyFallback() {
+        guard let url = legacyHistoryURL, let data = try? JSONEncoder().encode(buckets) else { return }
+        try? data.write(to: url, options: .atomic)
+        lastPersist = Date()
+        storedFileSize = Self.fileSize(url)
+    }
+
+    private func updateStoredFileSize() {
+        guard let archiveURL = historyArchiveURL, let activeURL = activeHistoryURL else { return }
+        storedFileSize = Self.fileSize(archiveURL) &+ Self.fileSize(activeURL)
+    }
+
 }

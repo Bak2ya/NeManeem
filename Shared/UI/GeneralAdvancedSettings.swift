@@ -10,12 +10,7 @@ struct ResourceModeSettingsSection: View {
 
     var body: some View {
         Section(t("resourceModeTitle")) {
-            CompactSegmentedChoice(t("resourceModeTitle"), selection: $settings.resourceMode, options: [
-                (.austerity, t("resourceMode.austerity")),
-                (.saver, t("resourceMode.saver")),
-                (.balanced, t("resourceMode.balanced")),
-                (.performance, t("resourceMode.performance"))
-            ])
+            NMValueChoice(t("resourceModeTitle"), selection: $settings.resourceMode, options: resourceModeOptions, controlWidth: ResourceModeChoiceGeometry.controlWidth)
             SettingsHelpText(modeDescription, level: .detail)
 
             if settings.resourceMode == .austerity {
@@ -47,8 +42,19 @@ struct ResourceModeSettingsSection: View {
         }
     }
 
+    private var resourceModeOptions: [(ResourceMode, String)] {
+        ResourceMode.allCases.map { ($0, t("resourceMode.\($0.rawValue)")) }
+    }
+
     private var modeDescription: String {
         t("resourceModeDescription.\(settings.resourceMode.rawValue)")
+    }
+}
+
+private enum ResourceModeChoiceGeometry {
+    static let controlWidth = settingsInlineChoiceWidth
+    static func columnWidths(_ labels: [String]) -> [CGFloat] {
+        compactSegmentWidths(labels, totalWidth: controlWidth)
     }
 }
 
@@ -58,7 +64,7 @@ private struct ResourceModeComparisonTable: View {
 
     private let modes: [ResourceMode] = ResourceMode.allCases
     private var modeColumnWidths: [CGFloat] {
-        compactSegmentWidths(modes.map { t("resourceMode.\($0.rawValue)") })
+        ResourceModeChoiceGeometry.columnWidths(modes.map { t("resourceMode.\($0.rawValue)") })
     }
 
     var body: some View {
@@ -79,8 +85,8 @@ private struct ResourceModeComparisonTable: View {
             row(title: t("cmpCopyInfo"), values: ["—", "●", "●", "●"])
             row(title: t("cmpCSV"), values: ["—", "●", "●", "●"])
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.35), in: RoundedRectangle(cornerRadius: 9))
-        .overlay { RoundedRectangle(cornerRadius: 9).stroke(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 0.5) }
+        // Stay inside the section's native card instead of drawing a second nested
+        // card. The right-side mode columns share the chooser's exact geometry.
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -104,13 +110,13 @@ private struct ResourceModeComparisonTable: View {
                 }
             }
             .padding(.horizontal, 2)
-            .frame(width: settingsInlineChoiceWidth)
+            .frame(width: ResourceModeChoiceGeometry.controlWidth)
         }
         Divider().opacity(header ? 0.7 : 0.35)
     }
 
     private func columnBackground(_ mode: ResourceMode) -> Color {
-        mode == selected ? NeManeemTheme.accent.opacity(0.10) : .clear
+        mode == selected ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor).opacity(0.55) : .clear
     }
 }
 
@@ -144,14 +150,25 @@ struct ProfilesSettingsSection: View {
 
     private func profileRow(_ profile: NeManeemProfile) -> some View {
         let index = settings.profiles.firstIndex(where: { $0.id == profile.id }) ?? 0
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(profile.name).font(.body.weight(.medium)).lineLimit(1)
-                Spacer()
+                Spacer(minLength: 12)
                 Button(t("apply")) { settings.applyProfile(id: profile.id) }
                     .buttonStyle(NMNeutralActionButtonStyle())
                 Button(t("updateProfile")) { settings.updateProfile(id: profile.id) }
                     .buttonStyle(NMNeutralActionButtonStyle())
+            }
+            HStack(spacing: 8) {
+                Toggle(t("showProfileInQuickLaunch"), isOn: Binding(
+                    get: { settings.profiles.first(where: { $0.id == profile.id })?.showInQuickLaunch ?? false },
+                    set: { enabled in
+                        guard let i = settings.profiles.firstIndex(where: { $0.id == profile.id }) else { return }
+                        settings.profiles[i].showInQuickLaunch = enabled
+                    }
+                ))
+                .toggleStyle(.checkbox)
+                Spacer(minLength: 12)
                 Button(role: .destructive) { settings.deleteProfile(id: profile.id) } label: { Image(systemName: "trash") }
                     .buttonStyle(NMDestructiveIconButtonStyle())
                 Button { settings.moveProfile(id: profile.id, offset: -1) } label: { Image(systemName: "chevron.up") }
@@ -159,14 +176,6 @@ struct ProfilesSettingsSection: View {
                 Button { settings.moveProfile(id: profile.id, offset: 1) } label: { Image(systemName: "chevron.down") }
                     .buttonStyle(NMUtilityIconButtonStyle()).disabled(index >= settings.profiles.count - 1)
             }
-            Toggle(t("showProfileInQuickLaunch"), isOn: Binding(
-                get: { settings.profiles.first(where: { $0.id == profile.id })?.showInQuickLaunch ?? false },
-                set: { enabled in
-                    guard let i = settings.profiles.firstIndex(where: { $0.id == profile.id }) else { return }
-                    settings.profiles[i].showInQuickLaunch = enabled
-                }
-            ))
-            .toggleStyle(.checkbox)
             SettingsHelpText(t("showProfileInQuickLaunchHelp"), level: .detail)
         }
         .padding(.vertical, 3)
@@ -242,7 +251,6 @@ struct PermissionsSettingsSection: View {
         .onReceive(interface.$locationAuthorizationStatus.removeDuplicates()) { locationAuthorizationStatus = $0 }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshPermissionState()
-            interface.refreshWiFiIdentityAuthorizationStatus()
         }
     }
 

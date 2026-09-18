@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // optional network-identity services. If a measurement component has a
             // runtime problem, app launch itself must not become invisible.
             mainWindowController = MainWindowController(environment: environment)
-            statusBarController = StatusBarController(environment: environment) { [weak self] mode in
+            statusBarController = StatusBarController(environment: environment) { [weak self = self] mode in
                 self?.mainWindowController?.show(mode: mode)
             }
             logger.info("Launch +\(self.elapsedLaunchSeconds(), privacy: .public)s Status bar UI ready")
@@ -87,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .removeDuplicates()
                 .filter { $0 }
                 .receive(on: RunLoop.main)
-                .sink { [weak self] _ in
+                .sink { [weak self = self] _ in
                     Task { @MainActor [weak self] in
                         self?.scheduleMonitoringPermissionIntro(environment: AppEnvironment.shared)
                     }
@@ -144,13 +144,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .sink { AppearanceController.apply($0) }
                 .store(in: &cancellables)
 
+            // One process-level app-activation refresh replaces the identical Wi-Fi
+            // authorization checks that used to live in several settings screens.
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+                .sink { _ in
+                    environment.interfaceMonitor.refreshWiFiIdentityAuthorizationStatus()
+                }
+                .store(in: &cancellables)
+
             environment.settings.$resourceMode
                 .removeDuplicates()
                 .sink { mode in
                     environment.appTrafficMonitor.setResourceMode(mode)
                     if mode == .austerity || mode == .saver {
-                        environment.appTrafficMonitor.clearTemporaryCaches()
-                        environment.usageRecorder.clearTemporaryCaches()
+                        environment.clearTemporaryCaches(includeNetworkChoices: false)
                     }
                 }
                 .store(in: &cancellables)
@@ -160,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Build 50: visible UI first, persistent history/catalog/network services second.
             // The user can click the menu-bar item immediately; views show their normal
             // preparing state until these deferred tasks finish.
-            Task { @MainActor [weak self] in
+            Task { @MainActor [weak self = self] in
                 guard let self else { return }
                 self.logger.info("Launch +\(self.elapsedLaunchSeconds(), privacy: .public)s deferred startup begun")
 
@@ -183,11 +190,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.logger.info("Launch +\(self.elapsedLaunchSeconds(), privacy: .public)s deferred startup completed")
             }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self = self] in
                 guard let self else { return }
                 self.logger.info("Host heartbeat +2s")
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self = self] in
                 guard let self else { return }
                 self.logger.info("Host heartbeat +10s")
             }
@@ -252,8 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .informational
         alert.messageText = L10n.text("monitoringPermissionTitle", language: environment.settings.language)
         alert.informativeText = L10n.text("monitoringPermissionBody", language: environment.settings.language)
-        alert.addButton(withTitle: L10n.text("requestNetworkPermission", language: environment.settings.language))
-        alert.addButton(withTitle: L10n.text("later", language: environment.settings.language))
+        alert.addButton(withTitle: L10n.text("continuePermissionRequest", language: environment.settings.language))
         if alert.runModal() == .alertFirstButtonReturn {
             environment.firewallController.requestMonitoringPermission()
         }

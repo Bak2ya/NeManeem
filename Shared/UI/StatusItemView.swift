@@ -21,7 +21,7 @@ final class StatusItemView: NSView {
     var dataLimitUsedBytes: UInt64 = 0 { didSet { updateGeometry(); needsDisplay = true } }
     var settings: SettingsStore? { didSet { updateGeometry(); needsDisplay = true } }
     var onClick: (() -> Void)?
-    var onRightClick: (() -> Void)?
+    var onRightClick: ((NSEvent) -> Void)?
     var isPopoverShown = false { didSet { needsDisplay = true } }
 
     private var trackingAreaRef: NSTrackingArea?
@@ -42,7 +42,7 @@ final class StatusItemView: NSView {
     override func mouseEntered(with event: NSEvent) { hovering = true }
     override func mouseExited(with event: NSEvent) { hovering = false }
     override func mouseDown(with event: NSEvent) { onClick?() }
-    override func rightMouseDown(with event: NSEvent) { onRightClick?() }
+    override func rightMouseDown(with event: NSEvent) { onRightClick?(event) }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)

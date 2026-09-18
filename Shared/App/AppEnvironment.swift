@@ -28,6 +28,12 @@ final class AppEnvironment: ObservableObject {
     /// keeps multi-display flows on the monitor the user is actually working on.
     var requestedPresentationScreenFrame: NSRect?
 
+    func clearTemporaryCaches(includeNetworkChoices: Bool = true) {
+        appTrafficMonitor.clearTemporaryCaches()
+        usageRecorder.clearTemporaryCaches()
+        if includeNetworkChoices { interfaceMonitor.clearTemporaryCaches() }
+    }
+
     private init() {
         let settings = SettingsStore()
         let interfaceMonitor = NetworkInterfaceMonitor()
@@ -53,5 +59,23 @@ final class AppEnvironment: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        // Blocking safety reuses the existing Host <-> System Extension XPC road.
+        // Normal traffic snapshot requests count as liveness automatically; when no
+        // UI or recorder needs snapshots, AppTrafficMonitor falls back to one tiny
+        // liveness call roughly every 30 seconds.
+        Publishers.CombineLatest3(
+            firewallController.$engineIsEnabled.removeDuplicates(),
+            firewallController.$isEnabled.removeDuplicates(),
+            firewallController.$isDataLimitInternetBlocked.removeDuplicates()
+        )
+        .map { engineEnabled, appBlockingEnabled, dataLimitBlocked in
+            engineEnabled && (appBlockingEnabled || dataLimitBlocked)
+        }
+        .removeDuplicates()
+        .sink { active in
+            appTrafficMonitor.setDemand(.blockingSafety, active: active)
+        }
+        .store(in: &cancellables)
     }
 }

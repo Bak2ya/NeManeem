@@ -4,16 +4,22 @@ import OSLog
 import SwiftUI
 
 @MainActor
+private final class PopoverPreviewAnchorPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+@MainActor
 final class StatusBarController: NSObject, NSPopoverDelegate {
     private let logger = Logger(subsystem: "com.bak2ya.NeManeem", category: "StatusBar")
     private let environment: AppEnvironment
     private let statusItem: NSStatusItem
     private let statusView: StatusItemView
     private let popover = NSPopover()
+    private let previewPopover = NSPopover()
+    private var previewAnchorPanel: PopoverPreviewAnchorPanel?
     private let openMainWindow: (MainWindowMode) -> Void
     private var cancellables = Set<AnyCancellable>()
-    private var previewOwned = false
-    private var previewRequestGeneration = 0
     private var popoverReleaseWorkItem: DispatchWorkItem?
     private var pendingMainWindowMode: MainWindowMode?
     private var latestInterfaceSnapshot = NetworkSnapshot()
@@ -32,13 +38,16 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         statusView.snapshot = scopedMenuBarSnapshot()
         refreshDataLimitSnapshot()
         statusView.onClick = { [weak self] in self?.togglePopover() }
-        statusView.onRightClick = { [weak self] in self?.showQuickLaunchMenu() }
+        statusView.onRightClick = { [weak self] event in self?.showQuickLaunchMenu(with: event) }
         environment.requestPopoverPreview = { [weak self] visible in
             self?.setPopoverPreview(visible)
         }
         if let button = statusItem.button {
             button.title = ""
             button.image = nil
+            button.target = self
+            button.action = #selector(statusItemPrimaryAction(_:))
+            button.setAccessibilityLabel("NeManeem")
             statusView.frame = button.bounds
             statusView.autoresizingMask = [.width, .height]
             button.addSubview(statusView)
@@ -52,6 +61,13 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
+
+        // Settings preview uses a second *native* NSPopover so its arrow, material,
+        // shadow and corner treatment always match the running macOS release. The
+        // tiny nonactivating anchor panel exists only to provide a stable screen
+        // attachment point beside Settings; it never becomes user-visible or key.
+        previewPopover.behavior = .applicationDefined
+        previewPopover.animates = false
 
         environment.interfaceMonitor.$snapshot
             .sink { [weak self] snapshot in
@@ -124,7 +140,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                guard let self, self.popover.isShown, !self.previewOwned else { return }
+                guard let self, self.popover.isShown else { return }
                 self.popover.performClose(nil)
             }
             .store(in: &cancellables)
@@ -170,12 +186,11 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         }
     }
 
+    @objc private func statusItemPrimaryAction(_ sender: Any?) {
+        togglePopover()
+    }
+
     private func togglePopover() {
-        // A user click ends Settings-preview ownership. If it closes a preview,
-        // the settings toggle follows the actual visible state automatically.
-        previewRequestGeneration += 1
-        if previewOwned { environment.popoverPreviewVisible = false }
-        previewOwned = false
         popover.behavior = .transient
         if popover.isShown {
             popover.performClose(nil)
@@ -221,15 +236,11 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         }
     }
 
-    private func showQuickLaunchMenu() {
+    private func showQuickLaunchMenu(with event: NSEvent) {
         if popover.isShown { popover.performClose(nil) }
         let settings = environment.settings
         let t: (String) -> String = { L10n.text($0, language: settings.language) }
         let menu = NSMenu()
-        let heading = NSMenuItem(title: t("quickMode"), action: nil, keyEquivalent: "")
-        heading.isEnabled = false
-        menu.addItem(heading)
-
         let matchedProfile = settings.matchingProfile
         for mode in ResourceMode.allCases {
             let item = NSMenuItem(title: t("resourceMode.\(mode.rawValue)"), action: #selector(selectResourceMode(_:)), keyEquivalent: "")
@@ -259,7 +270,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: statusView.bounds.minY), in: statusView)
+        NSMenu.popUpContextMenu(menu, with: event, for: statusView)
     }
 
     @objc private func selectResourceMode(_ sender: NSMenuItem) {
@@ -282,52 +293,79 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     }
 
     private func setPopoverPreview(_ visible: Bool) {
-        previewRequestGeneration += 1
-        let generation = previewRequestGeneration
-
+        environment.popoverPreviewVisible = visible
         if visible {
-            environment.popoverPreviewVisible = true
-            showPreviewWhenAnchorIsReady(generation: generation, attempt: 0)
-        } else if previewOwned {
-            previewOwned = false
-            popover.performClose(nil)
-            popover.behavior = .transient
-            environment.popoverPreviewVisible = false
+            showNativePopoverPreview()
         } else {
-            environment.popoverPreviewVisible = false
+            previewPopover.performClose(nil)
+            previewPopover.contentViewController = nil
+            previewAnchorPanel?.orderOut(nil)
+            previewAnchorPanel = nil
+            environment.appTrafficMonitor.setDemand(.popover, active: popover.isShown && environment.settings.resourceMode != .austerity)
         }
     }
 
-    private func showPreviewWhenAnchorIsReady(generation: Int, attempt: Int) {
-        guard generation == previewRequestGeneration else { return }
-        // If the user already had the live popover open, Settings must not adopt
-        // ownership of it. The settings page may use it as the live preview, but
-        // leaving the page must not close a window the user opened independently.
-        if popover.isShown {
-            previewOwned = false
-            environment.popoverPreviewVisible = true
-            return
+    private func showNativePopoverPreview() {
+        let columns = activeStatusColumns(environment.settings.popoverColumns, appBlockingEnabled: environment.firewallController.isEnabled)
+        let width = statusWindowRecommendedWidth(columns: columns,
+                                                 processMode: environment.settings.popoverProcessDisplay,
+                                                 unitMode: environment.settings.popoverUnitMode,
+                                                 directionDisplay: environment.settings.popoverDirectionDisplay,
+                                                 scale: environment.settings.popoverScale.factor,
+                                                 language: environment.settings.language)
+
+        let settingsWindow = NSApp.keyWindow ?? NSApp.windows.first(where: {
+            $0.isVisible && $0.level == .normal && $0.contentViewController != nil
+        })
+        guard let settingsWindow else { return }
+
+        let anchor = previewAnchorPanel ?? PopoverPreviewAnchorPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 1, height: 1),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        anchor.level = .floating
+        anchor.hasShadow = false
+        anchor.isOpaque = false
+        anchor.backgroundColor = .clear
+        anchor.alphaValue = 0.01
+        anchor.ignoresMouseEvents = true
+        anchor.hidesOnDeactivate = false
+        anchor.collectionBehavior = [.transient, .moveToActiveSpace]
+        if anchor.contentView == nil {
+            anchor.contentView = NSView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
         }
 
-        guard statusView.window != nil else {
-            guard attempt < 6 else {
-                environment.popoverPreviewVisible = false
-                return
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                self?.showPreviewWhenAnchorIsReady(generation: generation, attempt: attempt + 1)
-            }
-            return
-        }
+        positionPreviewAnchor(anchor, beside: settingsWindow, previewWidth: width)
+        previewAnchorPanel = anchor
+        anchor.orderFrontRegardless()
 
-        // Defer one run-loop turn after the menu-bar view has a window. This keeps
-        // AppKit from calculating the preview against a stale status-item frame.
-        DispatchQueue.main.async { [weak self] in
-            guard let self, generation == self.previewRequestGeneration, !self.popover.isShown else { return }
-            self.previewOwned = true
-            self.popover.behavior = .applicationDefined
-            self.showPopover()
-        }
+        previewPopover.performClose(nil)
+        previewPopover.contentViewController = NSHostingController(rootView:
+            PopoverView(openMainWindow: { [weak self] mode in self?.openMainWindow(mode) })
+                .allowsHitTesting(false)
+        )
+        guard let anchorView = anchor.contentView else { return }
+        previewPopover.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .minY)
+
+        // The preview is visual-only. Keep the Settings window as the keyboard target.
+        settingsWindow.makeKeyAndOrderFront(nil)
+        environment.appTrafficMonitor.setDemand(.popover, active: environment.settings.resourceMode != .austerity)
+    }
+
+    private func positionPreviewAnchor(_ anchor: NSPanel, beside settingsWindow: NSWindow, previewWidth: CGFloat) {
+        let visible = settingsWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? settingsWindow.frame
+        let gap: CGFloat = 12
+        let margin: CGFloat = 8
+
+        let leftCenterX = settingsWindow.frame.minX - gap - previewWidth / 2
+        let rightCenterX = settingsWindow.frame.maxX + gap + previewWidth / 2
+        let leftFits = leftCenterX - previewWidth / 2 >= visible.minX + margin
+        let centerX = leftFits ? leftCenterX : min(rightCenterX, visible.maxX - margin - previewWidth / 2)
+        let anchorY = min(settingsWindow.frame.maxY - 8, visible.maxY - margin)
+
+        anchor.setFrame(NSRect(x: centerX - 0.5, y: anchorY, width: 1, height: 1), display: false)
     }
 
     func popoverWillShow(_ notification: Notification) {
@@ -337,9 +375,6 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
-        let wasPreview = previewOwned
-        previewOwned = false
-        if wasPreview { environment.popoverPreviewVisible = false }
         popover.behavior = .transient
         statusView.isPopoverShown = false
 

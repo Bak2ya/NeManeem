@@ -60,7 +60,6 @@ final class NeManeemFilterDataProvider: NEFilterDataProvider {
     private var blockingEnabled = false
     private var processBlockingEnabled = false
     private var dataLimitInternetBlocked = false
-    private var dataLimitBlockLeaseExpiresAt: TimeInterval = 0
     private var safariNetworkServiceGroupingEnabled = false
     private var didLogFirstFlow = false
     private var didLogFirstReport = false
@@ -145,9 +144,9 @@ final class NeManeemFilterDataProvider: NEFilterDataProvider {
         }
 
         let rules = currentRules()
-        if !appIdentifier.hasPrefix("com.bak2ya.NeManeem") {
+        let hostIsAlive = TrafficXPCServer.shared.hostIsAlive
+        if hostIsAlive, !appIdentifier.hasPrefix("com.bak2ya.NeManeem") {
             if rules.dataLimitInternetBlocked,
-               rules.dataLimitBlockLeaseExpiresAt > Date().timeIntervalSince1970,
                flowNetworkClass != .local {
                 logger.debug("HYBRID_SAFE dropped new flow by data-limit policy")
                 return .drop()
@@ -534,10 +533,10 @@ final class NeManeemFilterDataProvider: NEFilterDataProvider {
         identifier.lowercased().contains("webkit.networking")
     }
 
-    private func currentRules() -> (blockedBundleIdentifiers: Set<String>, blockedProcessIdentifiers: Set<String>, blockingEnabled: Bool, processBlockingEnabled: Bool, dataLimitInternetBlocked: Bool, dataLimitBlockLeaseExpiresAt: TimeInterval, safariNetworkServiceGroupingEnabled: Bool) {
+    private func currentRules() -> (blockedBundleIdentifiers: Set<String>, blockedProcessIdentifiers: Set<String>, blockingEnabled: Bool, processBlockingEnabled: Bool, dataLimitInternetBlocked: Bool, safariNetworkServiceGroupingEnabled: Bool) {
         rulesLock.lock()
         defer { rulesLock.unlock() }
-        return (blockedBundleIdentifiers, blockedProcessIdentifiers, blockingEnabled, processBlockingEnabled, dataLimitInternetBlocked, dataLimitBlockLeaseExpiresAt, safariNetworkServiceGroupingEnabled)
+        return (blockedBundleIdentifiers, blockedProcessIdentifiers, blockingEnabled, processBlockingEnabled, dataLimitInternetBlocked, safariNetworkServiceGroupingEnabled)
     }
 
     private func reloadRules(force: Bool = false) {
@@ -555,7 +554,6 @@ final class NeManeemFilterDataProvider: NEFilterDataProvider {
         blockingEnabled = configuration["blockingEnabled"] as? Bool ?? false
         processBlockingEnabled = configuration["processBlockingEnabled"] as? Bool ?? false
         dataLimitInternetBlocked = configuration["dataLimitInternetBlocked"] as? Bool ?? false
-        dataLimitBlockLeaseExpiresAt = configuration["dataLimitBlockLeaseExpiresAt"] as? Double ?? 0
         safariNetworkServiceGroupingEnabled = configuration["safariNetworkServiceGroupingEnabled"] as? Bool ?? false
         lastRulesReloadAt = now
         rulesLock.unlock()

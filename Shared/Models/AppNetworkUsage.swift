@@ -267,6 +267,71 @@ struct AppUsageGroup: Identifiable {
     }
 }
 
+@MainActor
+func applyingManualParentMappings(_ usages: [AppNetworkUsage], mappings: [String: String]) -> [AppNetworkUsage] {
+    guard !mappings.isEmpty else { return usages }
+    let ownerByBundle = Dictionary(usages.compactMap { usage -> (String, AppNetworkUsage)? in
+        guard !usage.isSystemProcess, let bundle = usage.bundleIdentifier, !bundle.isEmpty else { return nil }
+        return (bundle, usage)
+    }, uniquingKeysWith: { first, _ in first })
+
+    return usages.map { usage in
+        let key = usage.processIdentifier ?? (usage.isSystemProcess ? usage.id : nil)
+        guard let key, let targetBundle = mappings[key], targetBundle != usage.bundleIdentifier else { return usage }
+        let owner = ownerByBundle[targetBundle]
+        let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: targetBundle)
+        let bundle = appURL.flatMap(Bundle.init(url:))
+        let ownerName = owner?.appDisplayName ?? owner?.displayName
+            ?? (bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+            ?? (bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String)
+            ?? targetBundle
+        let icon = owner?.icon ?? appURL.map { NSWorkspace.shared.icon(forFile: $0.path) } ?? usage.icon
+        return AppNetworkUsage(
+            id: usage.id,
+            displayName: usage.displayName,
+            bundleIdentifier: targetBundle,
+            processIdentifier: usage.processIdentifier ?? usage.id,
+            appDisplayName: ownerName,
+            icon: icon,
+            isSystemProcess: false,
+            isAppleApp: owner?.isAppleApp ?? usage.isAppleApp,
+            downloadBytesPerSecond: usage.downloadBytesPerSecond,
+            uploadBytesPerSecond: usage.uploadBytesPerSecond,
+            localDownloadBytesPerSecond: usage.localDownloadBytesPerSecond,
+            localUploadBytesPerSecond: usage.localUploadBytesPerSecond,
+            unknownDownloadBytesPerSecond: usage.unknownDownloadBytesPerSecond,
+            unknownUploadBytesPerSecond: usage.unknownUploadBytesPerSecond,
+            cumulativeDownloadBytes: usage.cumulativeDownloadBytes,
+            cumulativeUploadBytes: usage.cumulativeUploadBytes,
+            cumulativeLocalDownloadBytes: usage.cumulativeLocalDownloadBytes,
+            cumulativeLocalUploadBytes: usage.cumulativeLocalUploadBytes,
+            cumulativeUnknownDownloadBytes: usage.cumulativeUnknownDownloadBytes,
+            cumulativeUnknownUploadBytes: usage.cumulativeUnknownUploadBytes,
+            lastActiveAt: usage.lastActiveAt
+        )
+    }
+}
+
+struct AppSystemUsageSplit {
+    let apps: [AppNetworkUsage]
+    let systemServices: [AppNetworkUsage]
+}
+
+/// One shared classification boundary for every user-facing traffic surface.
+/// Views may group/sort the two sides differently, but whether an identity is an
+/// app or a system service is decided here from `isSystemProcess` only.
+func splitAppAndSystemUsages(_ usages: [AppNetworkUsage]) -> AppSystemUsageSplit {
+    var apps: [AppNetworkUsage] = []
+    var systemServices: [AppNetworkUsage] = []
+    apps.reserveCapacity(usages.count)
+    systemServices.reserveCapacity(min(usages.count, 32))
+    for usage in usages {
+        if usage.isSystemProcess { systemServices.append(usage) }
+        else { apps.append(usage) }
+    }
+    return AppSystemUsageSplit(apps: apps, systemServices: systemServices)
+}
+
 func appUsageGroups(_ usages: [AppNetworkUsage]) -> [AppUsageGroup] {
     var buckets: [String: [AppNetworkUsage]] = [:]
 

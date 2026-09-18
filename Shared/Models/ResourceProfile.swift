@@ -146,7 +146,7 @@ struct NeManeemProfileSnapshot: Codable, Equatable {
         settings.showDownload = showDownload
         settings.showUpload = showUpload
         settings.metricOrder = MenuMetricOrder(rawValue: metricOrder) ?? .downloadFirst
-        settings.menuDisplayStyle = MenuDisplayStyle(rawValue: menuDisplayStyle) ?? .twoLineCompact
+        settings.menuDisplayStyle = LegacyMenuDisplayStyle(rawValue: menuDisplayStyle) ?? .twoLineCompact
         settings.showIcons = showIcons
         settings.unitMode = SpeedUnitMode(rawValue: unitMode) ?? .compactBytes
 

@@ -12,10 +12,10 @@ enum AppConstants {
     static let dataLimitBlockLeaseExpiryConfigurationKey = "dataLimitBlockLeaseExpiresAt"
     static let safariNetworkServiceGroupingConfigurationKey = "safariNetworkServiceGroupingEnabled"
     static let safariNetworkServiceGroupingDefaultsKey = "network.safariNetworkServiceGroupingEnabled"
-    /// Schema 9 keeps the same traffic snapshot wire shape while adding the explicit
-    /// code-signing process-block policy bits used by the data provider. Bumping the
-    /// generation ensures an older provider cannot silently ignore that policy.
-    static let trafficSnapshotSchemaVersion = 9
+    /// Schema 10 keeps the aggregate traffic snapshot shape while adding shared
+    /// signed-Host XPC liveness as the fail-open gate for app/Data Limit blocking.
+    /// An older provider must not be trusted for that safety contract.
+    static let trafficSnapshotSchemaVersion = 10
     static let processHierarchySchemaVersion = 2
     static let extensionRequestedSchemaDefaultsKey = "systemExtension.requestedTrafficSchemaVersion"
     static let extensionActiveSchemaDefaultsKey = "systemExtension.activeTrafficSchemaVersion"

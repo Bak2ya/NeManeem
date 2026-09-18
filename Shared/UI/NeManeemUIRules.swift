@@ -6,7 +6,8 @@ import SwiftUI
 /// Shared visual rules for settings-window controls.
 ///
 /// The settings shell keeps the app accent for stateful controls such as toggles,
-/// sliders, selection controls and the sidebar. Ordinary action buttons are neutral
+/// sliders, selected values and the sidebar. Selected values follow the configured
+/// accent; inactive/disabled selections stay neutral. Ordinary action buttons are neutral
 /// by default. Only an action that confirms a workflow uses the primary accent, and
 /// destructive actions opt into the destructive style explicitly.
 enum NMUIRulePack {
@@ -203,11 +204,20 @@ struct NMUtilityIconButtonStyle: ButtonStyle {
 struct NMInlineActionButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.controlActiveState) private var activeState
+    @Environment(\.accessibilityShowBorders) private var showBorders
 
     func makeBody(configuration: Configuration) -> some View {
         let active = isEnabled && activeState != .inactive
         return configuration.label
             .foregroundStyle(active ? Color.primary : Color(nsColor: .disabledControlTextColor))
+            .padding(.horizontal, showBorders ? 5 : 0)
+            .padding(.vertical, showBorders ? 3 : 0)
+            .overlay {
+                if showBorders {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(Color(nsColor: .separatorColor).opacity(0.75), lineWidth: 1)
+                }
+            }
             .opacity(configuration.isPressed ? 0.62 : (isEnabled ? 1 : 0.58))
             .contentShape(Rectangle())
     }
@@ -216,10 +226,19 @@ struct NMInlineActionButtonStyle: ButtonStyle {
 /// Borderless destructive icon, used for compact trash controls.
 struct NMDestructiveIconButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityShowBorders) private var showBorders
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(isEnabled ? Color.red : Color(nsColor: .disabledControlTextColor))
+            .padding(.horizontal, showBorders ? 5 : 0)
+            .padding(.vertical, showBorders ? 3 : 0)
+            .overlay {
+                if showBorders {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(Color.red.opacity(isEnabled ? 0.65 : 0.25), lineWidth: 1)
+                }
+            }
             .opacity(configuration.isPressed ? 0.62 : (isEnabled ? 1 : 0.58))
             .contentShape(Rectangle())
     }

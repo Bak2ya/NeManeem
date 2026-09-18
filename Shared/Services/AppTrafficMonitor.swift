@@ -8,7 +8,7 @@ import OSLog
 @MainActor
 final class AppTrafficMonitor: ObservableObject {
     private static let logger = Logger(subsystem: "com.bak2ya.NeManeem", category: "TrafficXPC")
-    enum Demand: Hashable { case menuBarInternet, popover, monitorWindow, settingsStatusWindow, settingsNetwork, troubleshooting, recording }
+    enum Demand: Hashable { case menuBarInternet, popover, monitorWindow, settingsStatusWindow, settingsNetwork, troubleshooting, recording, blockingSafety }
 
     @Published private(set) var usages: [AppNetworkUsage] = []
     /// Every process/app identity NeManeem has observed on this Mac. Unlike the live
@@ -184,9 +184,19 @@ final class AppTrafficMonitor: ObservableObject {
                     self.observedCatalogEnrichmentID = nil
                 }
             }
+
+            // Let the settings view paint first. Identity enrichment can touch
+            // LaunchServices, icons and code-signing metadata, so doing all of it in
+            // the first frame makes a large observed-app catalog feel sticky.
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            var pendingVisualChanges = 0
             for identifier in identifiers {
                 guard !Task.isCancelled, self.resourceMode != .austerity else { return }
-                _ = self.resolveIdentity(identifier: identifier)
+                if let saved = self.observedCatalog[identifier], !saved.displayName.isEmpty {
+                    _ = self.resolveObservedPresentation(identifier: identifier, saved: saved)
+                } else {
+                    _ = self.resolveIdentity(identifier: identifier)
+                }
                 if let saved = self.observedCatalog[identifier], let resolved = self.identityCache[identifier] {
                     self.observedCatalog[identifier] = ObservedCatalogEntry(identifier: identifier,
                                                                             displayName: saved.displayName.isEmpty ? resolved.displayName : saved.displayName,
@@ -195,9 +205,22 @@ final class AppTrafficMonitor: ObservableObject {
                                                                             appDisplayName: saved.appDisplayName ?? resolved.appDisplayName,
                                                                             isSystemProcess: saved.isSystemProcess || resolved.isSystemProcess,
                                                                             isAppleApp: saved.isAppleApp || resolved.isAppleApp)
+                    pendingVisualChanges += 1
                 }
+
+                // Rebuild in small batches instead of publishing the entire SwiftUI
+                // list once per identifier. This keeps Network Control responsive
+                // even when a long-lived installation has accumulated many apps.
+                if pendingVisualChanges >= 6 {
+                    self.rebuildObservedUsages(resolveMissingIdentity: false)
+                    pendingVisualChanges = 0
+                    try? await Task.sleep(nanoseconds: 20_000_000)
+                } else {
+                    await Task.yield()
+                }
+            }
+            if pendingVisualChanges > 0 {
                 self.rebuildObservedUsages(resolveMissingIdentity: false)
-                await Task.yield()
             }
         }
     }
@@ -276,7 +299,7 @@ final class AppTrafficMonitor: ObservableObject {
             switch demand {
             case .popover, .monitorWindow, .settingsStatusWindow:
                 return false
-            case .menuBarInternet, .settingsNetwork, .troubleshooting, .recording:
+            case .menuBarInternet, .settingsNetwork, .troubleshooting, .recording, .blockingSafety:
                 return true
             }
         }
@@ -296,7 +319,9 @@ final class AppTrafficMonitor: ObservableObject {
         if active.contains(.popover) { intervals.append(configuredPopoverInterval) }
         if active.contains(.monitorWindow) { intervals.append(configuredMonitorInterval) }
         if active.contains(.settingsStatusWindow) { intervals.append(configuredPopoverInterval) }
-        if active.contains(.settingsNetwork) || active.contains(.troubleshooting) || active.contains(.recording) { intervals.append(1.0) }
+        if active.contains(.settingsNetwork) || active.contains(.troubleshooting) { intervals.append(1.0) }
+        if active.contains(.recording) { intervals.append(3.0) }
+        if active.contains(.blockingSafety) { intervals.append(30.0) }
         return intervals.min() ?? 1.0
     }
 
@@ -326,13 +351,16 @@ final class AppTrafficMonitor: ObservableObject {
 
         pollNow()
 
-        // Establish a quick second sample so a 10-second presentation interval does
-        // not leave the popover saying "checking" for 10 seconds on first open.
-        let bootstrap = DispatchWorkItem { [weak self] in
-            Task { @MainActor in self?.pollNow() }
+        // Establish a quick second traffic sample so a 10-second presentation
+        // interval does not leave the popover saying "checking" for 10 seconds on
+        // first open. Liveness-only polling needs no bootstrap request.
+        if requiresTrafficSnapshot {
+            let bootstrap = DispatchWorkItem { [weak self] in
+                Task { @MainActor in self?.pollNow() }
+            }
+            bootstrapWorkItem = bootstrap
+            DispatchQueue.main.asyncAfter(deadline: .now() + min(0.5, currentPollingInterval), execute: bootstrap)
         }
-        bootstrapWorkItem = bootstrap
-        DispatchQueue.main.asyncAfter(deadline: .now() + min(0.5, currentPollingInterval), execute: bootstrap)
 
         startRegularPollingTimer()
     }
@@ -399,15 +427,23 @@ final class AppTrafficMonitor: ObservableObject {
             return
         }
 
-        remote.fetchTrafficSnapshot { [weak self] data in
-            Task { @MainActor in
-                guard let self else { return }
-                do {
-                    let snapshot = try JSONDecoder().decode(WireSnapshot.self, from: data)
-                    self.finishPoll(token: token, result: .success(snapshot))
-                } catch {
-                    self.finishPoll(token: token, result: .failure(error))
+        if requiresTrafficSnapshot || !hostLivenessProtocolKnown {
+            remote.fetchTrafficSnapshot { [weak self] data in
+                Task { @MainActor in
+                    guard let self else { return }
+                    do {
+                        let snapshot = try JSONDecoder().decode(WireSnapshot.self, from: data)
+                        self.finishPoll(token: token, result: .success(snapshot))
+                    } catch {
+                        self.finishPoll(token: token, result: .failure(error))
+                    }
                 }
+            }
+        } else {
+            // Blocking is active but no UI/recording feature needs a traffic
+            // snapshot. Reuse the existing XPC road for one tiny liveness call.
+            remote.reportHostLiveness { [weak self] in
+                Task { @MainActor in self?.finishLivenessPoll(token: token) }
             }
         }
 
@@ -419,6 +455,34 @@ final class AppTrafficMonitor: ObservableObject {
         }
     }
 
+    private var requiresTrafficSnapshot: Bool {
+        effectiveDemands.contains { $0 != .blockingSafety }
+    }
+
+    private var hostLivenessProtocolKnown: Bool {
+        UserDefaults.standard.integer(forKey: AppConstants.extensionActiveSchemaDefaultsKey) >= AppConstants.trafficSnapshotSchemaVersion
+    }
+
+    private func finishLivenessPoll(token: UUID) {
+        guard pollToken == token else { return }
+        pollToken = nil
+        pollInFlight = false
+        markConnectionSuccess()
+        startRegularPollingTimer()
+    }
+
+    private func markConnectionSuccess() {
+        let recovered = consecutiveConnectionFailures > 0
+        errorMessage = nil
+        hasPersistentConnectionError = false
+        connectionFailureStartedAt = nil
+        consecutiveConnectionFailures = 0
+        connectionFailureCount = 0
+        connectionRetryWorkItem?.cancel()
+        connectionRetryWorkItem = nil
+        if recovered { Self.logger.notice("XPC connection recovered") }
+    }
+
     private func finishPoll(token: UUID, result: Result<WireSnapshot, Error>) {
         guard pollToken == token else { return }
         pollToken = nil
@@ -426,15 +490,7 @@ final class AppTrafficMonitor: ObservableObject {
 
         switch result {
         case .success(let snapshot):
-            let recovered = consecutiveConnectionFailures > 0
-            errorMessage = nil
-            hasPersistentConnectionError = false
-            connectionFailureStartedAt = nil
-            consecutiveConnectionFailures = 0
-            connectionFailureCount = 0
-            connectionRetryWorkItem?.cancel()
-            connectionRetryWorkItem = nil
-            if recovered { Self.logger.notice("XPC connection recovered") }
+            markConnectionSuccess()
             consume(snapshot)
             startRegularPollingTimer()
             if !hasCompletedInitialSample { scheduleConnectionRetry(after: min(0.25, currentPollingInterval)) }
@@ -625,7 +681,7 @@ final class AppTrafficMonitor: ObservableObject {
         // Troubleshooting explicitly leaves this path and restores full identities.
         if resourceMode == .austerity,
            !effectiveDemands.isEmpty,
-           effectiveDemands.isSubset(of: [.recording, .menuBarInternet]) {
+           effectiveDemands.isSubset(of: [.recording, .menuBarInternet, .blockingSafety]) {
             consumeAnonymousAusteritySnapshot(snapshot, entries: visibleEntries, current: current)
             return
         }
@@ -635,13 +691,14 @@ final class AppTrafficMonitor: ObservableObject {
             previousCounters = current
             previousGeneratedAt = snapshot.generatedAt
             let keys = visibleEntries.map(Self.wireEntryKey)
-            rememberObservedProcessIDs(keys)
+            let observedIDsChanged = rememberObservedProcessIDs(keys)
+            var observedCatalogChanged = false
             for entry in visibleEntries {
                 let key = Self.wireEntryKey(entry)
                 let processIdentifier = entry.processIdentifier ?? entry.identifier
                 let identity = resolveIdentity(appIdentifier: entry.identifier,
                                                processIdentifier: processIdentifier)
-                rememberObservedIdentity(identity)
+                observedCatalogChanged = rememberObservedIdentity(identity) || observedCatalogChanged
                 let activeDate = entry.lastActivity > 0 ? Date(timeIntervalSince1970: entry.lastActivity) : now
                 tracked[key] = TrackedUsage(identity: identity,
                                             download: 0,
@@ -658,8 +715,9 @@ final class AppTrafficMonitor: ObservableObject {
                                             cumulativeUnknownUpload: entry.unknownOutboundBytes,
                                             lastActiveAt: activeDate)
             }
+            if observedIDsChanged || observedCatalogChanged { persistObservedCatalogState() }
             publishTrackedUsages()
-            rebuildObservedUsages()
+            if observedCatalogChanged || observedIDsChanged || observedUsages.isEmpty { rebuildObservedUsages() }
             return
         }
 
@@ -667,7 +725,8 @@ final class AppTrafficMonitor: ObservableObject {
         previousGeneratedAt = snapshot.generatedAt
         let now = Date()
         var seen = Set<String>()
-        rememberObservedProcessIDs(visibleEntries.map(Self.wireEntryKey))
+        let observedIDsChanged = rememberObservedProcessIDs(visibleEntries.map(Self.wireEntryKey))
+        var observedCatalogChanged = false
 
         for entry in visibleEntries {
             let key = Self.wireEntryKey(entry)
@@ -688,7 +747,7 @@ final class AppTrafficMonitor: ObservableObject {
             let processIdentifier = entry.processIdentifier ?? entry.identifier
             let identity = resolveIdentity(appIdentifier: entry.identifier,
                                            processIdentifier: processIdentifier)
-            rememberObservedIdentity(identity)
+            observedCatalogChanged = rememberObservedIdentity(identity) || observedCatalogChanged
             let activeDate = entry.lastActivity > 0 ? Date(timeIntervalSince1970: entry.lastActivity) : now
 
             tracked[key] = TrackedUsage(identity: identity,
@@ -731,8 +790,9 @@ final class AppTrafficMonitor: ObservableObject {
             for key in oldestKeys { tracked.removeValue(forKey: key) }
         }
 
+        if observedIDsChanged || observedCatalogChanged { persistObservedCatalogState() }
         publishTrackedUsages()
-        rebuildObservedUsages()
+        if observedCatalogChanged || observedIDsChanged { rebuildObservedUsages() }
         hasCompletedInitialSample = true
     }
 
@@ -821,16 +881,19 @@ final class AppTrafficMonitor: ObservableObject {
         }
     }
 
-    private func rememberObservedProcessIDs(_ identifiers: [String]) {
+    @discardableResult
+    private func rememberObservedProcessIDs(_ identifiers: [String]) -> Bool {
         let visibleIdentifiers = identifiers.filter { !Self.isKnownTransportRelayIdentifier($0) }
         let oldCount = observedProcessIDs.count
         observedProcessIDs.formUnion(visibleIdentifiers)
-        guard observedProcessIDs.count != oldCount else { return }
-        UserDefaults.standard.set(observedProcessIDs.sorted(), forKey: observedProcessIDsDefaultsKey)
+        return observedProcessIDs.count != oldCount
     }
 
-    private func rememberObservedIdentity(_ identity: ProcessIdentity) {
-        guard !Self.isKnownTransportRelayIdentifier(identity.key) else { return }
+    @discardableResult
+    private func rememberObservedIdentity(_ identity: ProcessIdentity) -> Bool {
+        guard !Self.isKnownTransportRelayIdentifier(identity.key) else { return false }
+
+        var catalogMembershipChanged = false
 
         // v0.5.13 could persist helper/XPC signing identifiers as standalone system
         // rows because the provider had not yet proven their outer owning .app. Once
@@ -842,13 +905,10 @@ final class AppTrafficMonitor: ObservableObject {
            appIdentifier != processIdentifier {
             let removedProcessID = observedProcessIDs.remove(processIdentifier) != nil
             let removedCatalogEntry = observedCatalog.removeValue(forKey: processIdentifier) != nil
-            if removedProcessID {
-                UserDefaults.standard.set(observedProcessIDs.sorted(), forKey: observedProcessIDsDefaultsKey)
-            }
-            if removedCatalogEntry { persistObservedCatalog() }
+            catalogMembershipChanged = removedProcessID || removedCatalogEntry
         }
 
-        observedProcessIDs.insert(identity.key)
+        let insertedIdentityID = observedProcessIDs.insert(identity.key).inserted
         let newEntry = ObservedCatalogEntry(identifier: identity.key,
                                             displayName: identity.displayName,
                                             bundleIdentifier: identity.bundleIdentifier,
@@ -864,7 +924,7 @@ final class AppTrafficMonitor: ObservableObject {
             old?.isSystemProcess != newEntry.isSystemProcess ||
             old?.isAppleApp != newEntry.isAppleApp
         observedCatalog[identity.key] = newEntry
-        if changed { persistObservedCatalog() }
+        return changed || catalogMembershipChanged || insertedIdentityID
     }
 
     private func rebuildObservedUsages(resolveMissingIdentity: Bool = false) {
@@ -906,6 +966,13 @@ final class AppTrafficMonitor: ObservableObject {
         UserDefaults.standard.removeObject(forKey: observedProcessIDsDefaultsKey)
         UserDefaults.standard.removeObject(forKey: observedCatalogDefaultsKey)
         rebuildObservedUsages()
+    }
+
+    private func persistObservedCatalogState() {
+        // One snapshot may discover many identities. Persist the stable ID set and
+        // catalog once after the batch instead of rewriting UserDefaults per entry.
+        UserDefaults.standard.set(observedProcessIDs.sorted(), forKey: observedProcessIDsDefaultsKey)
+        persistObservedCatalog()
     }
 
     private func persistObservedCatalog() {
@@ -954,6 +1021,29 @@ final class AppTrafficMonitor: ObservableObject {
     private static func isSafariNetworkServiceIdentifier(_ identifier: String?) -> Bool {
         guard let value = identifier?.lowercased() else { return false }
         return value.contains("webkit.networking")
+    }
+
+    /// Rehydrate display metadata for the stable observed catalog without re-running
+    /// code-signature ownership checks that were already captured when the app was
+    /// originally observed. This path is presentation-only and keeps Network Control
+    /// responsive on long-lived catalogs.
+    private func resolveObservedPresentation(identifier: String, saved: ObservedCatalogEntry) -> ProcessIdentity {
+        if let cached = identityCache[identifier] { return cached }
+        var icon = fallbackApplicationIcon
+        if let bundleIdentifier = saved.bundleIdentifier,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            icon = Self.compactIcon(NSWorkspace.shared.icon(forFile: appURL.path))
+        }
+        let value = ProcessIdentity(key: identifier,
+                                    displayName: saved.displayName,
+                                    bundleIdentifier: saved.bundleIdentifier,
+                                    processIdentifier: saved.processIdentifier,
+                                    appDisplayName: saved.appDisplayName,
+                                    icon: icon,
+                                    isSystemProcess: saved.isSystemProcess,
+                                    isAppleApp: saved.isAppleApp)
+        identityCache[identifier] = value
+        return value
     }
 
     private func resolveIdentity(identifier: String) -> ProcessIdentity {

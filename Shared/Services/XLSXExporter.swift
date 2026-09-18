@@ -90,6 +90,52 @@ enum XLSXExporter {
     }
 
 
+
+    static func exportCSVBundle(rows: [UsageExportRow], total: AppBytePair, start: Date, end: Date, destination: URL) throws {
+        let iso = ISO8601DateFormatter()
+
+        var dataCSV = "timestamp,scope,app_identifier,network,download_bytes,upload_bytes,total_bytes\n"
+        for row in rows {
+            let fields = [iso.string(from: row.start), row.scope, row.appIdentifier ?? "", row.networkName ?? ""]
+                .map(csvField).joined(separator: ",")
+            dataCSV += "\(fields),\(row.download),\(row.upload),\(row.download + row.upload)\n"
+        }
+
+        var appTotals: [String: AppBytePair] = [:]
+        for row in rows where row.scope == "app" {
+            guard let id = row.appIdentifier else { continue }
+            var value = appTotals[id] ?? AppBytePair()
+            value.download &+= row.download
+            value.upload &+= row.upload
+            appTotals[id] = value
+        }
+
+        var summaryCSV = "item,value,download_bytes,upload_bytes,total_bytes\n"
+        summaryCSV += "start,\(csvField(iso.string(from: start))),,,\n"
+        summaryCSV += "end,\(csvField(iso.string(from: end))),,,\n"
+        summaryCSV += "overall,,\(total.download),\(total.upload),\(total.download + total.upload)\n"
+        summaryCSV += "\napp_identifier,,download_bytes,upload_bytes,total_bytes\n"
+        for entry in appTotals.sorted(by: {
+            let lhs = $0.value.download &+ $0.value.upload
+            let rhs = $1.value.download &+ $1.value.upload
+            return lhs == rhs ? $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending : lhs > rhs
+        }) {
+            summaryCSV += "\(csvField(entry.key)),,\(entry.value.download),\(entry.value.upload),\(entry.value.download + entry.value.upload)\n"
+        }
+
+        try StoredZipWriter.write(files: [
+            ("summary.csv", Data(summaryCSV.utf8)),
+            ("usage-records.csv", Data(dataCSV.utf8))
+        ], to: destination)
+    }
+
+    private static func csvField(_ value: String) -> String {
+        if value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r") {
+            return "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }
+        return value
+    }
+
     static func exportDataUsageRecords(records: [DataUsageRecord], destination: URL) throws {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = .current

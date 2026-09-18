@@ -113,7 +113,7 @@ final class TrafficMeasurementEngine {
         }
         lock.unlock()
 
-        let snapshot = TrafficCounterSnapshot(schemaVersion: 7,
+        let snapshot = TrafficCounterSnapshot(schemaVersion: 10,
                                               generatedAt: Date().timeIntervalSince1970,
                                               engineStartedAt: startedAt,
                                               entries: values)
@@ -134,6 +134,28 @@ final class TrafficXPCServer: NSObject, NSXPCListenerDelegate, NeManeemTrafficXP
     private lazy var expectedHostRequirement: String? = Self.peerCodeSigningRequirement(bundleIdentifier: expectedHostIdentifier)
     private let diagnosticLock = NSLock()
     private var didLogFirstSnapshotRequest = false
+
+    // Blocking is fail-open unless a signed NeManeem Host is demonstrably alive.
+    // Snapshot requests are already Host activity; a tiny liveness call is needed
+    // only during quiet periods. The stale timeout also covers a Host process that
+    // remains connected but is completely hung.
+    private let hostStateLock = NSLock()
+    private var activeHostConnectionIDs = Set<UUID>()
+    private var lastHostActivityAt = Date.distantPast
+    private var lastHostDisconnectAt = Date.distantPast
+    private let hostActivityTimeout: TimeInterval = 90
+    private let hostDisconnectGrace: TimeInterval = 2
+
+    var hostIsAlive: Bool {
+        let now = Date()
+        hostStateLock.lock()
+        defer { hostStateLock.unlock() }
+        let activityFresh = now.timeIntervalSince(lastHostActivityAt) <= hostActivityTimeout
+        if !activeHostConnectionIDs.isEmpty { return activityFresh }
+        // Polling cadence changes can intentionally replace the Host XPC connection.
+        // A tiny grace prevents a millisecond-scale fail-open flap during that handoff.
+        return activityFresh && now.timeIntervalSince(lastHostDisconnectAt) <= hostDisconnectGrace
+    }
 
     private override init() { super.init() }
 
@@ -162,10 +184,16 @@ final class TrafficXPCServer: NSObject, NSXPCListenerDelegate, NeManeemTrafficXP
         newConnection.setCodeSigningRequirement(requirement)
         newConnection.exportedInterface = NSXPCInterface(with: NeManeemTrafficXPCProtocol.self)
         newConnection.exportedObject = self
+        let connectionID = UUID()
+        registerHostConnection(connectionID)
         newConnection.invalidationHandler = { [weak self] in
+            self?.unregisterHostConnection(connectionID)
             self?.logger.notice("Accepted host XPC connection invalidated")
         }
         newConnection.interruptionHandler = { [weak self] in
+            // An interrupted NSXPCConnection may recover without a new listener
+            // callback. Keep its connection identity until final invalidation; the
+            // 90-second activity timeout still fails open if the Host is hung.
             self?.logger.notice("Accepted host XPC connection interrupted")
         }
         newConnection.resume()
@@ -174,12 +202,40 @@ final class TrafficXPCServer: NSObject, NSXPCListenerDelegate, NeManeemTrafficXP
     }
 
     func fetchTrafficSnapshot(withReply reply: @escaping (Data) -> Void) {
+        noteHostActivity()
         diagnosticLock.lock()
         let shouldLog = !didLogFirstSnapshotRequest
         didLogFirstSnapshotRequest = true
         diagnosticLock.unlock()
         if shouldLog { logger.notice("XPC received its first traffic snapshot request") }
         reply(TrafficMeasurementEngine.shared.snapshotData())
+    }
+
+    func reportHostLiveness(withReply reply: @escaping () -> Void) {
+        noteHostActivity()
+        reply()
+    }
+
+    private func registerHostConnection(_ id: UUID) {
+        hostStateLock.lock()
+        activeHostConnectionIDs.insert(id)
+        lastHostActivityAt = Date()
+        hostStateLock.unlock()
+    }
+
+    private func unregisterHostConnection(_ id: UUID) {
+        hostStateLock.lock()
+        let removed = activeHostConnectionIDs.remove(id) != nil
+        if removed, activeHostConnectionIDs.isEmpty {
+            lastHostDisconnectAt = Date()
+        }
+        hostStateLock.unlock()
+    }
+
+    private func noteHostActivity() {
+        hostStateLock.lock()
+        lastHostActivityAt = Date()
+        hostStateLock.unlock()
     }
 
     private static func peerCodeSigningRequirement(bundleIdentifier: String) -> String? {

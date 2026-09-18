@@ -34,10 +34,10 @@ final class FirewallController: NSObject, ObservableObject {
     /// macOS request without attempting to undo work that already completed.
     private var removalOperationID: UUID?
     private var filterReconfigurationStartedAt: Date?
+    // Legacy vendor field kept at zero so an older stored configuration remains
+    // comparable during migration. Build 143+ fail-open safety uses shared Host XPC
+    // liveness instead of repeatedly rewriting Network Extension preferences.
     private var dataLimitBlockLeaseExpiresAt: TimeInterval = 0
-    private var dataLimitLeaseTimer: Timer?
-    private static let dataLimitLeaseDuration: TimeInterval = 15
-    private static let dataLimitLeaseHeartbeat: TimeInterval = 5
 
     override init() {
         super.init()
@@ -50,13 +50,14 @@ final class FirewallController: NSObject, ObservableObject {
         UserDefaults.standard.set(Array(blockedProcessIdentifiers).sorted(), forKey: blockedProcessesDefaultsKey)
         extensionController.onNeedsUserApproval = { [weak self] in
             Task { @MainActor in
-                self?.extensionNeedsUserApproval = true
-                self?.monitoringPermissionRequestRecommended = false
+                guard let self, !self.removalInProgress else { return }
+                self.extensionNeedsUserApproval = true
+                self.monitoringPermissionRequestRecommended = false
                 // macOS is now waiting for the user's explicit approval, not for
                 // an in-app operation. Surface the System Settings action instead
                 // of leaving the permission card in a disabled busy state.
-                self?.activationInFlight = false
-                self?.isBusy = false
+                self.activationInFlight = false
+                self.isBusy = false
             }
         }
     }
@@ -95,8 +96,6 @@ final class FirewallController: NSObject, ObservableObject {
                 // re-validating the current limit cycle and target network.
                 self.isDataLimitInternetBlocked = false
                 self.dataLimitBlockLeaseExpiresAt = 0
-                self.dataLimitLeaseTimer?.invalidate()
-                self.dataLimitLeaseTimer = nil
                 self.statusMessage = nil
                 if storedBlock && self.engineIsEnabled {
                     self.saveVendorConfiguration(blockingEnabled: self.isEnabled, completion: nil)
@@ -209,6 +208,10 @@ final class FirewallController: NSObject, ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 self.activationInFlight = false
+                if self.removalInProgress {
+                    Self.logger.notice("Ignoring activation completion because safe removal is in progress")
+                    return
+                }
                 switch result {
                 case .success:
                     self.extensionNeedsUserApproval = false
@@ -234,6 +237,7 @@ final class FirewallController: NSObject, ObservableObject {
         case removed
         case requiresReboot
         case notInstalled
+        case retryLater
         case failed(String)
     }
 
@@ -252,13 +256,10 @@ final class FirewallController: NSObject, ObservableObject {
         let operationID = UUID()
         removalInProgress = true
         removalOperationID = operationID
-        activationInFlight = false
         isBusy = true
         statusMessage = nil
         monitoringPermissionRequestRecommended = false
         extensionNeedsUserApproval = false
-        dataLimitLeaseTimer?.invalidate()
-        dataLimitLeaseTimer = nil
         isDataLimitInternetBlocked = false
         dataLimitBlockLeaseExpiresAt = 0
         isEnabled = false
@@ -339,6 +340,15 @@ final class FirewallController: NSObject, ObservableObject {
                         completion(RemovalOutcome(filterPreferencesRemoved: filterRemoved,
                                                    filterPreferencesError: filterError,
                                                    systemExtension: .notInstalled))
+                    } else if nsError.domain == OSSystemExtensionError.errorDomain &&
+                                nsError.code == OSSystemExtensionError.Code.requestSuperseded.rawValue {
+                        // macOS is still resolving an earlier activation/deactivation
+                        // request for this same System Extension. This is transient,
+                        // not evidence of a broken extension; preserve user data and
+                        // ask the user to retry after the OS finishes the prior work.
+                        completion(RemovalOutcome(filterPreferencesRemoved: filterRemoved,
+                                                   filterPreferencesError: filterError,
+                                                   systemExtension: .retryLater))
                     } else {
                         completion(RemovalOutcome(filterPreferencesRemoved: filterRemoved,
                                                    filterPreferencesError: filterError,
@@ -356,7 +366,6 @@ final class FirewallController: NSObject, ObservableObject {
         guard removalInProgress else { return }
         removalOperationID = nil
         removalInProgress = false
-        activationInFlight = false
         isBusy = false
         statusMessage = nil
     }
@@ -458,23 +467,16 @@ final class FirewallController: NSObject, ObservableObject {
     func setDataLimitInternetBlocked(_ blocked: Bool) {
         if blocked,
            UserDefaults.standard.integer(forKey: AppConstants.extensionActiveSchemaDefaultsKey) < AppConstants.trafficSnapshotSchemaVersion {
-            // Older providers do not understand the short Host lease. Never arm a
-            // global Internet block until the fail-open-capable provider is active.
+            // Older providers do not understand shared Host-liveness fail-open safety.
+            // Never arm a global Internet block until the new provider is active.
             Self.logger.notice("Data-limit block deferred until fail-open provider generation is active")
             return
         }
-        if blocked == isDataLimitInternetBlocked {
-            if blocked { startDataLimitLeaseHeartbeat() }
-            return
-        }
-        if blocked {
-            dataLimitBlockLeaseExpiresAt = Date().timeIntervalSince1970 + Self.dataLimitLeaseDuration
-            startDataLimitLeaseHeartbeat()
-        } else {
-            dataLimitLeaseTimer?.invalidate()
-            dataLimitLeaseTimer = nil
-            dataLimitBlockLeaseExpiresAt = 0
-        }
+        if blocked == isDataLimitInternetBlocked { return }
+        // Build 143+: the provider gates both app blocking and Data Limit blocking
+        // on the signed Host's shared XPC liveness. No 5-second preference rewrite
+        // heartbeat is needed; policy preferences change only when policy changes.
+        dataLimitBlockLeaseExpiresAt = 0
 
         let previous = isDataLimitInternetBlocked
         isDataLimitInternetBlocked = blocked
@@ -483,40 +485,21 @@ final class FirewallController: NSObject, ObservableObject {
             saveVendorConfiguration(blockingEnabled: isEnabled) { [weak self] error in
                 guard let self, error != nil else { return }
                 self.isDataLimitInternetBlocked = previous
-                if !previous {
-                    self.dataLimitLeaseTimer?.invalidate()
-                    self.dataLimitLeaseTimer = nil
-                    self.dataLimitBlockLeaseExpiresAt = 0
-                }
+                if !previous { self.dataLimitBlockLeaseExpiresAt = 0 }
             }
         } else if blocked {
             ensureMonitoringEngineEnabled()
         }
     }
 
-    /// Called during normal Host termination. The explicit save is best-effort;
-    /// even if macOS terminates before it completes, the provider-side lease expires
-    /// quickly and releases the block automatically.
+    /// Called during normal Host termination. The explicit save is best-effort.
+    /// App-specific rules stay saved for the next launch, but the provider also
+    /// fails open as soon as the signed Host XPC connection disappears.
     func prepareForHostTermination() {
-        dataLimitLeaseTimer?.invalidate()
-        dataLimitLeaseTimer = nil
         guard isDataLimitInternetBlocked else { return }
         isDataLimitInternetBlocked = false
         dataLimitBlockLeaseExpiresAt = 0
         if engineIsEnabled { saveVendorConfiguration(blockingEnabled: isEnabled, completion: nil) }
-    }
-
-    private func startDataLimitLeaseHeartbeat() {
-        guard dataLimitLeaseTimer == nil else { return }
-        dataLimitLeaseTimer = Timer.scheduledTimer(withTimeInterval: Self.dataLimitLeaseHeartbeat, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, self.isDataLimitInternetBlocked else { return }
-                self.dataLimitBlockLeaseExpiresAt = Date().timeIntervalSince1970 + Self.dataLimitLeaseDuration
-                if self.engineIsEnabled {
-                    self.saveVendorConfiguration(blockingEnabled: self.isEnabled, completion: nil)
-                }
-            }
-        }
     }
 
     private func configureEngine(blockingEnabled: Bool) {
@@ -698,31 +681,37 @@ final class FirewallController: NSObject, ObservableObject {
 private final class SystemExtensionController: NSObject, OSSystemExtensionRequestDelegate {
     var onNeedsUserApproval: (() -> Void)?
     private let logger = Logger(subsystem: "com.bak2ya.NeManeem", category: "SystemExtensionRequest")
-    private enum RequestKind { case activation, deactivation }
-    private var requestKind: RequestKind?
-    private var activationCompletion: ((Result<Void, Error>) -> Void)?
-    private var deactivationCompletion: ((Result<OSSystemExtensionRequest.Result, Error>) -> Void)?
-    private var activationStartedAt: Date?
+
+    private enum RequestContext {
+        case activation(startedAt: Date, completion: (Result<Void, Error>) -> Void)
+        case deactivation(startedAt: Date, completion: (Result<OSSystemExtensionRequest.Result, Error>) -> Void)
+
+        var startedAt: Date {
+            switch self {
+            case .activation(let startedAt, _), .deactivation(let startedAt, _):
+                return startedAt
+            }
+        }
+    }
+
+    /// macOS may finish an older activation after a user immediately starts safe
+    /// removal. Keep completion state keyed by the actual request object so one
+    /// request can never overwrite or misattribute another request's callback.
+    private var contexts: [ObjectIdentifier: RequestContext] = [:]
 
     func activate(identifier: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        requestKind = .activation
-        activationCompletion = completion
-        deactivationCompletion = nil
-        activationStartedAt = Date()
         logger.notice("System Extension activation request submitted")
         let request = OSSystemExtensionRequest.activationRequest(forExtensionWithIdentifier: identifier, queue: .main)
         request.delegate = self
+        contexts[ObjectIdentifier(request)] = .activation(startedAt: Date(), completion: completion)
         OSSystemExtensionManager.shared.submitRequest(request)
     }
 
     func deactivate(identifier: String, completion: @escaping (Result<OSSystemExtensionRequest.Result, Error>) -> Void) {
-        requestKind = .deactivation
-        activationCompletion = nil
-        deactivationCompletion = completion
-        activationStartedAt = Date()
         logger.notice("System Extension deactivation request submitted")
         let request = OSSystemExtensionRequest.deactivationRequest(forExtensionWithIdentifier: identifier, queue: .main)
         request.delegate = self
+        contexts[ObjectIdentifier(request)] = .deactivation(startedAt: Date(), completion: completion)
         OSSystemExtensionManager.shared.submitRequest(request)
     }
 
@@ -738,37 +727,35 @@ private final class SystemExtensionController: NSObject, OSSystemExtensionReques
     }
 
     func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
-        let elapsed = activationStartedAt.map { Date().timeIntervalSince($0) } ?? 0
-        activationStartedAt = nil
-        logger.notice("System Extension request finished result=\(String(describing: result), privacy: .public) elapsed=\(elapsed, privacy: .public)s")
-        switch requestKind {
-        case .activation:
-            activationCompletion?(.success(()))
-        case .deactivation:
-            deactivationCompletion?(.success(result))
-        case .none:
-            break
+        let key = ObjectIdentifier(request)
+        guard let context = contexts.removeValue(forKey: key) else {
+            logger.notice("System Extension completion arrived for an already-finished request")
+            return
         }
-        requestKind = nil
-        activationCompletion = nil
-        deactivationCompletion = nil
+        let elapsed = Date().timeIntervalSince(context.startedAt)
+        logger.notice("System Extension request finished result=\(String(describing: result), privacy: .public) elapsed=\(elapsed, privacy: .public)s")
+        switch context {
+        case .activation(_, let completion):
+            completion(.success(()))
+        case .deactivation(_, let completion):
+            completion(.success(result))
+        }
     }
 
     func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
-        let elapsed = activationStartedAt.map { Date().timeIntervalSince($0) } ?? 0
-        activationStartedAt = nil
+        let key = ObjectIdentifier(request)
+        guard let context = contexts.removeValue(forKey: key) else {
+            logger.notice("System Extension failure arrived for an already-finished request")
+            return
+        }
+        let elapsed = Date().timeIntervalSince(context.startedAt)
         let nsError = error as NSError
         logger.error("System Extension request failed errorDomain=\(nsError.domain, privacy: .public) code=\(nsError.code) elapsed=\(elapsed, privacy: .public)s")
-        switch requestKind {
-        case .activation:
-            activationCompletion?(.failure(error))
-        case .deactivation:
-            deactivationCompletion?(.failure(error))
-        case .none:
-            break
+        switch context {
+        case .activation(_, let completion):
+            completion(.failure(error))
+        case .deactivation(_, let completion):
+            completion(.failure(error))
         }
-        requestKind = nil
-        activationCompletion = nil
-        deactivationCompletion = nil
     }
 }

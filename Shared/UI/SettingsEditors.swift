@@ -109,7 +109,7 @@ struct NMInlineCustomNumericEditor: NSViewRepresentable {
     final class InlineView: NSView {
         let field = NSTextField()
         let unitLabel = NSTextField(labelWithString: "")
-        let confirmLabel = ClickableLabel(text: "✓")
+        let confirmLabel = NSButton(title: "✓", target: nil, action: nil)
         var fieldWidth: CGFloat = 32
         var confirmationWidth: CGFloat = 12
         var spacing: CGFloat = 3
@@ -140,26 +140,6 @@ struct NMInlineCustomNumericEditor: NSViewRepresentable {
         }
     }
 
-    final class ClickableLabel: NSTextField {
-        var onClick: (() -> Void)?
-
-        convenience init(text: String) {
-            self.init(frame: .zero)
-            stringValue = text
-            isEditable = false
-            isSelectable = false
-            isBordered = false
-            drawsBackground = false
-        }
-
-        override func mouseDown(with event: NSEvent) {
-            onClick?()
-        }
-
-        override func resetCursorRects() {
-            addCursorRect(bounds, cursor: .pointingHand)
-        }
-    }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -179,9 +159,13 @@ struct NMInlineCustomNumericEditor: NSViewRepresentable {
         view.unitLabel.alignment = .left
         view.unitLabel.lineBreakMode = .byClipping
 
-        view.confirmLabel.textColor = .controlAccentColor
+        view.confirmLabel.contentTintColor = .controlAccentColor
         view.confirmLabel.alignment = .center
-        view.confirmLabel.onClick = { context.coordinator.commit() }
+        view.confirmLabel.target = context.coordinator
+        view.confirmLabel.action = #selector(Coordinator.commit)
+        view.confirmLabel.isBordered = false
+        view.confirmLabel.bezelStyle = .inline
+        view.confirmLabel.setButtonType(.momentaryChange)
         view.confirmLabel.setAccessibilityLabel(confirmationAccessibilityLabel)
 
         view.addSubview(view.field)
@@ -203,7 +187,11 @@ struct NMInlineCustomNumericEditor: NSViewRepresentable {
         view.fieldWidth = fieldWidth
         view.confirmationWidth = confirmationWidth
         view.spacing = spacing
-        view.confirmLabel.onClick = { context.coordinator.commit() }
+        view.confirmLabel.target = context.coordinator
+        view.confirmLabel.action = #selector(Coordinator.commit)
+        view.confirmLabel.isBordered = false
+        view.confirmLabel.bezelStyle = .inline
+        view.confirmLabel.setButtonType(.momentaryChange)
         view.confirmLabel.setAccessibilityLabel(confirmationAccessibilityLabel)
         view.needsLayout = true
     }
@@ -272,7 +260,40 @@ func compactSegmentWidths(_ labels: [String],
     }
 }
 
-struct CompactSegmentedChoice<SelectionValue: Hashable>: View {
+enum NMValueChoiceAppearance {
+    static func foreground(selected: Bool, isEnabled: Bool, controlActiveState: ControlActiveState) -> Color {
+        if selected {
+            return (controlActiveState == .inactive || !isEnabled)
+                ? Color(nsColor: .unemphasizedSelectedTextColor)
+                : NeManeemTheme.accentForeground
+        }
+        return isEnabled ? Color.primary : Color(nsColor: .disabledControlTextColor)
+    }
+
+    static func background(selected: Bool, isEnabled: Bool, controlActiveState: ControlActiveState) -> Color {
+        guard selected else { return .clear }
+        if controlActiveState == .inactive || !isEnabled {
+            return Color(nsColor: .unemphasizedSelectedContentBackgroundColor).opacity(0.55)
+        }
+        return NeManeemTheme.accent
+    }
+
+    static var editingBorder: Color { Color(nsColor: .separatorColor).opacity(0.72) }
+    static var editingBackground: Color { Color(nsColor: .unemphasizedSelectedContentBackgroundColor).opacity(0.42) }
+}
+
+extension View {
+    /// Menu-style Picker and DatePicker controls are value displays, not selection
+    /// surfaces. Keep their resting value presentation neutral even though the
+    /// Settings shell provides the configured accent to stateful controls.
+    func nmNeutralValueControl() -> some View { self.tint(.primary) }
+
+    /// Native segmented controls represent an explicit current selection and may
+    /// therefore use the configured system/custom/neutral accent.
+    func nmAccentValueControl() -> some View { self.tint(NeManeemTheme.accent) }
+}
+
+struct NMValueChoice<SelectionValue: Hashable>: View {
     @Environment(\.controlActiveState) private var controlActiveState
     @Environment(\.isEnabled) private var isEnabled
     let title: String
@@ -341,16 +362,12 @@ struct CompactSegmentedChoice<SelectionValue: Hashable>: View {
         let option = options[index]
         let isSelected = selection == option.value
         let textWeight: Font.Weight = isSelected ? .semibold : .regular
-        let isInactive = controlActiveState == .inactive || !isEnabled
-        let textColor: Color
-        if isSelected {
-            textColor = isInactive ? Color(nsColor: .unemphasizedSelectedTextColor) : NeManeemTheme.accentForeground
-        } else {
-            textColor = isEnabled ? .primary : Color(nsColor: .disabledControlTextColor)
-        }
-        let fillColor: Color = isSelected
-            ? (isInactive ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor) : NeManeemTheme.accent)
-            : .clear
+        let textColor = NMValueChoiceAppearance.foreground(selected: isSelected,
+                                                            isEnabled: isEnabled,
+                                                            controlActiveState: controlActiveState)
+        let fillColor = NMValueChoiceAppearance.background(selected: isSelected,
+                                                            isEnabled: isEnabled,
+                                                            controlActiveState: controlActiveState)
 
         return Button {
             selection = option.value
@@ -455,8 +472,8 @@ struct RetentionPeriodEditor: View {
                     }
                     .padding(.leading, settingsCustomInputHorizontalPadding)
                     .frame(width: customSlotWidth, height: settingsCompactSegmentContentHeight, alignment: .center)
-                    .background(NeManeemTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay { RoundedRectangle(cornerRadius: 6).stroke(NeManeemTheme.accent.opacity(0.55), lineWidth: 0.8) }
+                    .background(NMValueChoiceAppearance.editingBackground, in: RoundedRectangle(cornerRadius: 6))
+                    .overlay { RoundedRectangle(cornerRadius: 6).stroke(NMValueChoiceAppearance.editingBorder, lineWidth: 0.8) }
                     .onExitCommand {
                         editingCustom = false
                         customFocused = false
@@ -489,15 +506,16 @@ struct RetentionPeriodEditor: View {
         Button(action: action) {
             Text(label)
                 .font(.body.weight(selected ? .semibold : .regular))
-                .foregroundStyle(selected
-                    ? ((controlActiveState == .inactive || !isEnabled) ? Color(nsColor: .unemphasizedSelectedTextColor) : NeManeemTheme.accentForeground)
-                    : (isEnabled ? Color.primary : Color(nsColor: .disabledControlTextColor)))
+                .foregroundStyle(NMValueChoiceAppearance.foreground(selected: selected,
+                                                                       isEnabled: isEnabled,
+                                                                       controlActiveState: controlActiveState))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity, minHeight: settingsCompactSegmentContentHeight)
-                .background(selected
-                    ? ((controlActiveState == .inactive || !isEnabled) ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor) : NeManeemTheme.accent)
-                    : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                .background(NMValueChoiceAppearance.background(selected: selected,
+                                                                       isEnabled: isEnabled,
+                                                                       controlActiveState: controlActiveState),
+                            in: RoundedRectangle(cornerRadius: 6))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -596,7 +614,7 @@ struct ClosedDataRetentionEditor: View {
             .background(invalidCustom ? Color.red.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
             .overlay {
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(invalidCustom ? Color.red.opacity(0.9) : NeManeemTheme.accent.opacity(0.55), lineWidth: invalidCustom ? 1.2 : 0.8)
+                    .stroke(invalidCustom ? Color.red.opacity(0.9) : NMValueChoiceAppearance.editingBorder, lineWidth: invalidCustom ? 1.2 : 0.8)
             }
             .onExitCommand(perform: cancelCustomEdit)
         } else {
@@ -612,15 +630,16 @@ struct ClosedDataRetentionEditor: View {
         Button(action: action) {
             Text(label)
                 .font(.body.weight(selected ? .semibold : .regular))
-                .foregroundStyle(selected
-                    ? ((controlActiveState == .inactive || !isEnabled) ? Color(nsColor: .unemphasizedSelectedTextColor) : NeManeemTheme.accentForeground)
-                    : (isEnabled ? Color.primary : Color(nsColor: .disabledControlTextColor)))
+                .foregroundStyle(NMValueChoiceAppearance.foreground(selected: selected,
+                                                                       isEnabled: isEnabled,
+                                                                       controlActiveState: controlActiveState))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity, minHeight: settingsCompactSegmentContentHeight)
-                .background(selected
-                    ? ((controlActiveState == .inactive || !isEnabled) ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor) : NeManeemTheme.accent)
-                    : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                .background(NMValueChoiceAppearance.background(selected: selected,
+                                                                       isEnabled: isEnabled,
+                                                                       controlActiveState: controlActiveState),
+                            in: RoundedRectangle(cornerRadius: 6))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -808,7 +827,7 @@ struct RefreshIntervalEditor: View {
             .background(invalidCustom ? Color.red.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
             .overlay {
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(invalidCustom ? Color.red.opacity(0.9) : NeManeemTheme.accent.opacity(0.55), lineWidth: invalidCustom ? 1.2 : 0.8)
+                    .stroke(invalidCustom ? Color.red.opacity(0.9) : NMValueChoiceAppearance.editingBorder, lineWidth: invalidCustom ? 1.2 : 0.8)
             }
             .help(t("minimumIntervalHelp"))
             .onExitCommand(perform: cancelCustomEdit)
@@ -828,15 +847,16 @@ struct RefreshIntervalEditor: View {
         Button(action: action) {
             Text(label)
                 .font(.body.weight(selected ? .semibold : .regular))
-                .foregroundStyle(selected
-                    ? ((controlActiveState == .inactive || !isEnabled) ? Color(nsColor: .unemphasizedSelectedTextColor) : NeManeemTheme.accentForeground)
-                    : (isEnabled ? Color.primary : Color(nsColor: .disabledControlTextColor)))
+                .foregroundStyle(NMValueChoiceAppearance.foreground(selected: selected,
+                                                                       isEnabled: isEnabled,
+                                                                       controlActiveState: controlActiveState))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity, minHeight: settingsCompactSegmentContentHeight)
-                .background(selected
-                    ? ((controlActiveState == .inactive || !isEnabled) ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor) : NeManeemTheme.accent)
-                    : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                .background(NMValueChoiceAppearance.background(selected: selected,
+                                                                       isEnabled: isEnabled,
+                                                                       controlActiveState: controlActiveState),
+                            in: RoundedRectangle(cornerRadius: 6))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -939,6 +959,7 @@ struct LowActivityThresholdEditor: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
+            .nmNeutralValueControl()
             .frame(width: 68)
 
             Text(t("during"))
@@ -956,6 +977,7 @@ struct LowActivityThresholdEditor: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
+            .nmNeutralValueControl()
             .frame(width: 72)
 
             Text(t("orLess"))
@@ -1020,5 +1042,64 @@ struct NumericAdjuster: View {
 
     private func clamp() {
         value = min(range.upperBound, max(range.lowerBound, value))
+    }
+}
+
+
+/// One context-menu implementation is shared by Popover, Monitor, Network and Usage.
+/// App/location resolution remains lazy: opening a row never performs Finder/LaunchServices work.
+struct AppIdentityContextMenuContent: View {
+    let usage: AppNetworkUsage
+    let preferProcess: Bool
+    @ObservedObject private var settings = AppEnvironment.shared.settings
+    @ObservedObject private var traffic = AppEnvironment.shared.appTrafficMonitor
+
+    private var t: (String) -> String { { L10n.text($0, language: settings.language) } }
+    private var hasFinderIdentity: Bool {
+        if preferProcess, let process = usage.processIdentifier, !process.isEmpty { return true }
+        return !(usage.bundleIdentifier?.isEmpty ?? true)
+    }
+    private var finderTitle: String {
+        if preferProcess,
+           let process = usage.processIdentifier,
+           !process.isEmpty,
+           process != usage.bundleIdentifier {
+            return t("revealProcessInFinder")
+        }
+        return t("revealAppInFinder")
+    }
+
+    var body: some View {
+        Group {
+            Button(t("appInformation")) {
+                AppLocationResolver.showInformation(for: usage,
+                                                    manualParentBundle: settings.manualParentMapping(for: usage),
+                                                    language: settings.language)
+            }
+            if hasFinderIdentity {
+                Button(finderTitle) {
+                    if let location = AppLocationResolver.resolve(usage, preferProcess: preferProcess) {
+                        AppLocationResolver.reveal(location)
+                    }
+                }
+            }
+            if AppLocationResolver.canManuallyGroup(usage) {
+                let candidates = AppLocationResolver.parentAppCandidates(from: traffic.observedUsages, excluding: usage)
+                if !candidates.isEmpty {
+                    Menu(t("groupUnderApp")) {
+                        ForEach(candidates) { candidate in
+                            Button(candidate.displayName) {
+                                settings.setManualParentApp(candidate.bundleIdentifier, for: usage)
+                            }
+                        }
+                    }
+                }
+                if settings.manualParentMapping(for: usage) != nil {
+                    Button(t("automaticGrouping")) {
+                        settings.setManualParentApp(nil, for: usage)
+                    }
+                }
+            }
+        }
     }
 }

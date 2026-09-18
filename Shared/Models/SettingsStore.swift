@@ -17,7 +17,7 @@ enum MenuMetricOrder: String, CaseIterable, Identifiable {
 /// Retained only to decode settings/profile files created before the free-layout
 /// menu bar replaced the old three-style selector. It is intentionally not
 /// exposed in the current UI and should not drive new rendering decisions.
-enum MenuDisplayStyle: String, CaseIterable, Identifiable {
+enum LegacyMenuDisplayStyle: String, CaseIterable, Identifiable {
     case twoLineCompact
     case oneLineCompact
     case oneLineLarge
@@ -144,10 +144,18 @@ enum StatusColumn: String, CaseIterable, Identifiable, Codable {
     case month
     case session
     case dataCycle
-    case block
+    case allowed = "block"
 
     var id: String { rawValue }
-    static let defaultColumns: [StatusColumn] = [.process, .download, .upload, .block]
+    static let defaultColumns: [StatusColumn] = [.process, .download, .upload, .allowed]
+}
+
+/// A configured column can remain in the user's layout while its backing feature is off.
+/// Rendering filters those temporarily unavailable columns without mutating the saved order.
+func activeStatusColumns(_ columns: [StatusColumn], appBlockingEnabled: Bool) -> [StatusColumn] {
+    let source = columns.isEmpty ? StatusColumn.defaultColumns : columns
+    let filtered = source.filter { $0 != .allowed || appBlockingEnabled }
+    return filtered.isEmpty ? [.process] : filtered
 }
 
 enum DataRenewalMode: String, CaseIterable, Identifiable {
@@ -350,7 +358,7 @@ final class SettingsStore: ObservableObject {
     @Published var showDownload: Bool { didSet { save(showDownload, Keys.showDownload) } }
     @Published var showUpload: Bool { didSet { save(showUpload, Keys.showUpload) } }
     @Published var metricOrder: MenuMetricOrder { didSet { save(metricOrder.rawValue, Keys.metricOrder) } }
-    @Published var menuDisplayStyle: MenuDisplayStyle { didSet { save(menuDisplayStyle.rawValue, Keys.menuDisplayStyle) } }
+    @Published var menuDisplayStyle: LegacyMenuDisplayStyle { didSet { save(menuDisplayStyle.rawValue, Keys.menuDisplayStyle) } }
     @Published var showIcons: Bool { didSet { save(showIcons, Keys.showIcons) } }
     @Published var menuBarTopElements: [MenuBarElement] { didSet { save(menuBarTopElements.map(\.rawValue), Keys.menuBarTopElements) } }
     @Published var menuBarBottomElements: [MenuBarElement] { didSet { save(menuBarBottomElements.map(\.rawValue), Keys.menuBarBottomElements) } }
@@ -416,6 +424,7 @@ final class SettingsStore: ObservableObject {
     @Published var popoverGroupUnselectedApps: Bool { didSet { save(popoverGroupUnselectedApps, Keys.popoverGroupUnselectedApps) } }
     @Published var advancedProcessControlsEnabled: Bool { didSet { save(advancedProcessControlsEnabled, Keys.advancedProcessControlsEnabled) } }
     @Published var hiddenDetailProcessIDs: [String] { didSet { save(hiddenDetailProcessIDs, Keys.hiddenDetailProcessIDs) } }
+    @Published var manualParentAppMappings: [String: String] { didSet { save(manualParentAppMappings, Keys.manualParentAppMappings) } }
     @Published var popoverColumns: [StatusColumn] { didSet { save(popoverColumns.map(\.rawValue), Keys.popoverColumns) } }
     @Published var trafficOrderPresets: [TrafficOrderPreset] { didSet { savePresets() } }
 
@@ -529,7 +538,7 @@ final class SettingsStore: ObservableObject {
         showDownload = defaults.object(forKey: Keys.showDownload) as? Bool ?? true
         showUpload = defaults.object(forKey: Keys.showUpload) as? Bool ?? true
         metricOrder = MenuMetricOrder(rawValue: defaults.string(forKey: Keys.metricOrder) ?? "") ?? .downloadFirst
-        menuDisplayStyle = MenuDisplayStyle(rawValue: defaults.string(forKey: Keys.menuDisplayStyle) ?? "") ?? .twoLineCompact
+        menuDisplayStyle = LegacyMenuDisplayStyle(rawValue: defaults.string(forKey: Keys.menuDisplayStyle) ?? "") ?? .twoLineCompact
         showIcons = defaults.object(forKey: Keys.showIcons) as? Bool ?? false
         let loadedMenuBarTop = Self.loadMenuBarElements(defaults.stringArray(forKey: Keys.menuBarTopElements), fallback: MenuBarElement.defaultTop)
         let loadedMenuBarBottom = Self.loadMenuBarElements(defaults.stringArray(forKey: Keys.menuBarBottomElements), fallback: MenuBarElement.defaultBottom)
@@ -634,6 +643,7 @@ final class SettingsStore: ObservableObject {
         popoverGroupUnselectedApps = defaults.object(forKey: Keys.popoverGroupUnselectedApps) as? Bool ?? false
         advancedProcessControlsEnabled = defaults.object(forKey: Keys.advancedProcessControlsEnabled) as? Bool ?? false
         hiddenDetailProcessIDs = defaults.stringArray(forKey: Keys.hiddenDetailProcessIDs) ?? []
+        manualParentAppMappings = defaults.dictionary(forKey: Keys.manualParentAppMappings) as? [String: String] ?? [:]
         popoverColumns = Self.loadColumns(defaults.stringArray(forKey: Keys.popoverColumns))
         if let data = defaults.data(forKey: Keys.trafficOrderPresets),
            let decoded = try? JSONDecoder().decode([TrafficOrderPreset].self, from: data) {
@@ -1135,6 +1145,26 @@ final class SettingsStore: ObservableObject {
         if monitor && !monitorUsePopoverSettings { monitorManualOrder = preset.order } else { popoverManualOrder = preset.order }
     }
 
+    func setManualParentApp(_ bundleIdentifier: String?, for usage: AppNetworkUsage) {
+        guard let key = manualParentMappingKey(for: usage) else { return }
+        if let bundleIdentifier, !bundleIdentifier.isEmpty {
+            manualParentAppMappings[key] = bundleIdentifier
+        } else {
+            manualParentAppMappings.removeValue(forKey: key)
+        }
+    }
+
+    func manualParentMapping(for usage: AppNetworkUsage) -> String? {
+        guard let key = manualParentMappingKey(for: usage) else { return nil }
+        return manualParentAppMappings[key]
+    }
+
+    private func manualParentMappingKey(for usage: AppNetworkUsage) -> String? {
+        if let process = usage.processIdentifier, !process.isEmpty { return process }
+        if usage.isSystemProcess && !usage.id.isEmpty { return usage.id }
+        return nil
+    }
+
     func setStatusColumnVisible(_ column: StatusColumn, visible: Bool, monitor: Bool) {
         guard column != .process else { return }
         var columns = monitor && !monitorUsePopoverSettings ? monitorColumns : popoverColumns
@@ -1296,6 +1326,7 @@ final class SettingsStore: ObservableObject {
         static let popoverGroupUnselectedApps = "popover.groupUnselectedApps"
         static let advancedProcessControlsEnabled = "status.advancedProcessControlsEnabled"
         static let hiddenDetailProcessIDs = "status.hiddenDetailProcessIDs"
+        static let manualParentAppMappings = "status.manualParentAppMappingsV1"
         static let popoverColumns = "popover.columns"
         static let trafficOrderPresets = "popover.orderPresets"
         static let monitorUsePopoverSettings = "monitor.usePopoverSettings"

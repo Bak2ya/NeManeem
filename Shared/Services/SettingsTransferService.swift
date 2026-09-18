@@ -15,6 +15,20 @@ enum SettingsTransferSection: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    var localizationKey: String {
+        switch self {
+        case .general: return "backupGeneral"
+        case .menuBar: return "backupMenuBar"
+        case .statusWindows: return "backupStatusWindows"
+        case .networkBehavior: return "backupNetworkBehavior"
+        case .usagePreferences: return "backupUsagePreferences"
+        case .dataLimit: return "backupDataLimit"
+        case .observedApps: return "backupObservedApps"
+        case .appPreferences: return "backupAppPreferences"
+        case .networkIdentifiers: return "backupNetworkIdentifiers"
+        }
+    }
+
     var isPersonalInfoGroup: Bool {
         switch self {
         case .observedApps, .appPreferences, .networkIdentifiers: return true
@@ -82,6 +96,7 @@ enum SettingsTransferService {
         for key in selectedKeys {
             if let value = defaults[key] { values[key] = value }
         }
+        sanitizeProfileNetworkIdentifiersIfNeeded(values: &values, sections: sections)
 
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
@@ -234,6 +249,33 @@ enum SettingsTransferService {
         return firstError
     }
 
+
+    /// Profiles are part of General settings, but a profile may also remember the
+    /// selected Data Limit network. Respect the separate Network Identifiers export
+    /// choice so an SSID/network identity cannot leak through `general.profilesV1`.
+    /// This transforms only the exported copy; the live SettingsStore is untouched.
+    private static func sanitizeProfileNetworkIdentifiersIfNeeded(values: inout [String: Any],
+                                                                  sections: Set<SettingsTransferSection>) {
+        guard sections.contains(.general), !sections.contains(.networkIdentifiers) else { return }
+        let key = "general.profilesV1"
+        guard let data = values[key] as? Data else { return }
+        guard var profiles = try? JSONDecoder().decode([NeManeemProfile].self, from: data) else {
+            // Fail closed for privacy. A profile blob we cannot understand must not
+            // bypass the user's explicit decision to exclude network identifiers.
+            values.removeValue(forKey: key)
+            return
+        }
+        for index in profiles.indices {
+            profiles[index].snapshot.dataLimitNetworkIdentifier = ""
+            profiles[index].snapshot.dataLimitNetworkDisplayName = ""
+        }
+        if let sanitized = try? JSONEncoder().encode(profiles) {
+            values[key] = sanitized
+        } else {
+            values.removeValue(forKey: key)
+        }
+    }
+
     private static func keys(for section: SettingsTransferSection, availableKeys: Set<String>) -> Set<String> {
         switch section {
         case .general:
@@ -277,6 +319,6 @@ enum SettingsTransferService {
     private static func isAppPreferenceKey(_ key: String) -> Bool {
         let suffixes = ["manualOrder", "hiddenProcessIDs", "selectedProcessIDs", "orderPresets"]
         if suffixes.contains(where: { key.hasSuffix($0) }) { return true }
-        return key == "status.hiddenDetailProcessIDs"
+        return key == "status.hiddenDetailProcessIDs" || key == "status.manualParentAppMappingsV1"
     }
 }
